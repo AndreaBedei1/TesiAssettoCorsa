@@ -68,7 +68,7 @@ class CustomEarlyStoppingTorch:
         mean_precision = np.mean(precision_per_class)
 
         if self.verbose:
-            print(f"Validation Macro Precision: {mean_precision:.4f}")
+            print(f"\nValidation Macro Precision: {mean_precision:.4f}")
 
         return mean_precision
 

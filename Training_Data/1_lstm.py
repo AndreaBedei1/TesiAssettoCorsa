@@ -89,7 +89,6 @@ else:
 y_train_labels = np.argmax(y_train, axis=1)
 # class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_train_labels), y=y_train_labels)
 # class_weights_dict = dict(enumerate(class_weights))
-# class_weights_dict[0] *= 3
 
 custom_early_stopping = CustomEarlyStopping(validation_data=(X_val, y_val), patience=7)
 

@@ -100,7 +100,7 @@ model = build_model(X_train.shape[1:], n_classes=len(result_classes))
 model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 model.summary()
 
-custom_early_stopping = CustomEarlyStopping(validation_data=(X_val, y_val), patience=7)
+custom_early_stopping = CustomEarlyStopping(validation_data=(X_val, y_val), patience=10)
 
 # === Training ===
 callbacks = [custom_early_stopping]

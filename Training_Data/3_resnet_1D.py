@@ -3,7 +3,6 @@ import numpy as np
 import joblib
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.utils.class_weight import compute_class_weight
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -11,6 +10,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
+from sklearn.utils.class_weight import compute_class_weight
+
 
 from preprocess_dataset import fix_dataset, load_telemetry_data
 from custom_early_stop import CustomEarlyStoppingTorch
@@ -41,6 +42,8 @@ np.save("./models/1_resnet_classes.npy", result_classes)
 df["track"] = LabelEncoder().fit_transform(df["track"])
 df["driver"] = LabelEncoder().fit_transform(df["driver"])
 df["temp"] = LabelEncoder().fit_transform(df["temp"])
+df["time_idx"] = df.groupby(["track", "driver", "temp"]).cumcount()
+
 
 feature_cols = [col for col in df.columns if col not in ["track", "driver", "temp", "result"]]
 scaler = StandardScaler()
@@ -122,6 +125,14 @@ model = ResNet1DTabular(input_dim=X_train.shape[1], num_classes=len(result_class
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 early_stopper = CustomEarlyStoppingTorch(patience=patience)
+
+# class_weights = compute_class_weight(
+#     class_weight="balanced",
+#     classes=np.unique(y_train),
+#     y=y_train
+# )
+# class_weights_tensor = torch.tensor(class_weights, dtype=torch.float32).to(device)
+# criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
 
 train_losses, val_losses = [], []
 train_accuracies, val_accuracies = [], []

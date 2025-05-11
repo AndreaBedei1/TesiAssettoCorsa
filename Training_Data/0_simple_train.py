@@ -73,11 +73,7 @@ else:
     X_test, y_test = X[train_size+val_size:], y[train_size+val_size:]
 
 model = Sequential([
-    Dense(256, activation='relu', input_shape=(X_train.shape[1],)),
-    Dropout(0.3),
-    Dense(256, activation='relu'),
-    Dropout(0.3),
-    Dense(128, activation='relu'),
+    Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
     Dropout(0.2),
     Dense(64, activation='relu'),
     Dense(32, activation='relu'),
@@ -121,7 +117,7 @@ y_true_classes = np.argmax(y_test, axis=1)
 report = classification_report(y_true_classes, y_pred_classes, target_names=result_classes, output_dict=True, zero_division=0)
 for label, metrics in report.items():
     if isinstance(metrics, dict):  # Skip overall metrics like 'accuracy'
-        print(f"Accuracy for label '{label}': {metrics['precision']:.2f}")
+        print(f"precision for label '{label}': {metrics['precision']:.2f}")
 
 conf_matrix = confusion_matrix(y_true_classes, y_pred_classes, normalize='true')
 

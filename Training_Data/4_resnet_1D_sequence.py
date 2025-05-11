@@ -19,7 +19,7 @@ split_by_circuit = True
 window_size = 5
 batch_size = 64
 num_epochs = 100
-patience = 10
+patience = 8
 
 # === Load and preprocess ===
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
@@ -176,6 +176,7 @@ model = ResNet1D(input_features=input_features,
                  seq_length=seq_length, 
                  num_classes=len(result_classes)).to(device)
 criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
+# criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 early_stopper = CustomEarlyStoppingTorch(patience=patience)
 
