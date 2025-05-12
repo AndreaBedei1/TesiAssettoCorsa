@@ -24,10 +24,10 @@ scaler = joblib.load("../Training_Data/models/0_simple_scaler.pkl")
 
 
 LABEL_STATES = {
-    0: ("Neutral", QColor(0, 128, 0)),
+    0: ("Grip Loss", QColor(255, 0, 0)),
     1: ("High Grip - Accelerate", QColor(0, 255, 0)),
     2: ("Low Grip", QColor(255, 165, 0)),
-    3: ("Grip Loss", QColor(255, 0, 0))
+    3: ("Neutral", QColor(0, 128, 0)),
 }
 
 def interpolate_color(value, max_val=1.0):
@@ -119,7 +119,7 @@ class MainWindow(QWidget):
         }
         self.sounds[1].setSource(QUrl.fromLocalFile("high_grip.wav"))
         self.sounds[2].setSource(QUrl.fromLocalFile("limit_grip.wav"))
-        self.sounds[3].setSource(QUrl.fromLocalFile("loss_grip.wav"))
+        self.sounds[0].setSource(QUrl.fromLocalFile("loss_grip.wav"))
 
         for s in self.sounds.values():
             s.setVolume(0.5)
@@ -186,7 +186,7 @@ class MainWindow(QWidget):
 
         # Modello selezionabile
         self.model_selector = QComboBox()
-        self.model_selector.addItems(["Simple Model", "LSTM"])
+        self.model_selector.addItems(["Simple Model", "LSTM", "Transformers"])
         self.model_selector.setFont(QFont("Roboto", 14))
         self.model_selector.currentIndexChanged.connect(self.load_model)
 
@@ -243,6 +243,7 @@ class MainWindow(QWidget):
 
         if processed_data is not None:
             result = predict_realtime(self.model, processed_data)
+            print(f"Predizione: {result}")
             slips = [telem["wheel_slip"][0], telem["wheel_slip"][1], telem["wheel_slip"][2], telem["wheel_slip"][3]]
             label_pred = result
 
@@ -332,7 +333,6 @@ def preprocess_realtime_data_lstm(telem, graphics, scaler, realtime_window, wind
 def predict_realtime(model, processed_data):
     prediction = model.predict(processed_data, verbose=0)
     predicted_class = np.argmax(prediction, axis=1)[0]
-    print(predicted_class)
     return predicted_class
 
 if __name__ == "__main__":
