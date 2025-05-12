@@ -6,6 +6,22 @@ from PyQt5.QtGui import QColor, QPainter, QPen, QFont, QIcon
 from PyQt5.QtCore import Qt, QTimer, QUrl
 from PyQt5.QtMultimedia import QSoundEffect
 
+from keras.models import load_model
+import joblib
+import numpy as np
+import pandas as pd
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from env.shared_memory_physics import read_telemetry
+from env.shared_memory_graphics import read_graphics
+
+model = load_model("../Training_Data/models/0_simple_cnn_model.keras")
+scaler = joblib.load("../Training_Data/models/0_simple_scaler.pkl")
+
+
 
 LABEL_STATES = {
     0: ("Neutral", QColor(0, 128, 0)),
@@ -14,7 +30,7 @@ LABEL_STATES = {
     3: ("Grip Loss", QColor(255, 0, 0))
 }
 
-def interpolate_color(value, max_val=0.7):
+def interpolate_color(value, max_val=1.0):
     ratio = min(max(value / max_val, 0.0), 1.0)
     hue = (120 - 120 * ratio) / 360.0  # green to red
     color = QColor.fromHsvF(hue, 0.85, 0.9)  # più desaturato, stile vintage
@@ -181,8 +197,14 @@ class MainWindow(QWidget):
         self.timer.start(500)
 
     def update_data(self):
-        slips = [0,0,0,0] #[random.uniform(0, 0.7) for _ in range(4)]
-        label_pred = 3 #random.choice([0, 1, 2])
+        telem = read_telemetry()
+        graphics = read_graphics()
+
+        result = predict_realtime(telem, graphics)
+        print(result)
+
+        slips = [telem["wheel_slip"][0],telem["wheel_slip"][1],telem["wheel_slip"][2],telem["wheel_slip"][3]] #[random.uniform(0, 0.7) for _ in range(4)]
+        label_pred = result
 
         self.visualizer.update_slips(slips)
 
@@ -201,6 +223,60 @@ class MainWindow(QWidget):
         
         self.current_label_pred = label_pred
         self.sounds[label_pred].play()
+
+def convert_to_milliseconds(time_str: str) -> int:
+    parts = time_str.split(":")
+    if len(parts) != 3:
+        raise ValueError("Formato non valido. Deve essere 'minuti:secondi:millisecondi'")
+    
+    minutes = int(parts[0])
+    seconds = int(parts[1])
+    milliseconds = int(parts[2])
+
+    total_milliseconds = (minutes * 60 * 1000) + (seconds * 1000) + milliseconds
+    return total_milliseconds
+
+def preprocess_realtime_data(telem, graphics):
+    data = {
+        "gas": telem["gas"],
+        "brake": telem["brake"],
+        "rpm": telem["rpm"],
+        "steer": telem["steer"],
+        "speed": telem["speed"],
+        "g_force_x": telem["g_force"][2],  # Inversione a causa di un bug
+        "g_force_y": telem["g_force"][0],  # Inversione a causa di un bug
+        "g_force_z": telem["g_force"][1],  # Inversione a causa di un bug
+        "pressure_front_left": telem["pressure"][0],
+        "pressure_front_right": telem["pressure"][1],
+        "pressure_rear_left": telem["pressure"][2],
+        "pressure_rear_right": telem["pressure"][3],
+        "tyre_temp_front_left": telem["tyre_temp"][0],
+        "tyre_temp_front_right": telem["tyre_temp"][1],
+        "tyre_temp_rear_left": telem["tyre_temp"][2],
+        "tyre_temp_rear_right": telem["tyre_temp"][3],
+        "air_temp": telem["air_temp"],
+        "road_temp": telem["road_temp"],
+        "yaw_rate": telem["yaw_rate"],
+        "normalized_car_position": graphics["normalized_car_position"],
+        "wind_speed": graphics["wind_speed"],
+        "wind_direction": graphics["wind_direction"],
+        "current_time": convert_to_milliseconds(graphics["current_time_str"].rstrip('\x00')),
+    }
+
+    df = pd.DataFrame([data])
+
+    # Applica lo scaler al dataframe
+    scaled_features = scaler.transform(df)
+
+    # Restituisci i dati trasformati come array NumPy
+    return scaled_features
+
+
+def predict_realtime(telem, graphics):
+    processed_data = preprocess_realtime_data(telem, graphics)
+    prediction = model.predict(processed_data, verbose=0)
+    predicted_class = np.argmax(prediction, axis=1)[0]
+    return predicted_class
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
