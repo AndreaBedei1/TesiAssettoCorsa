@@ -107,6 +107,8 @@ class MainWindow(QWidget):
         self.setWindowIcon(QIcon("img.png"))
 
         self.current_label_pred = None  # salva l'ultima label mostrata
+        self.time_idx_counter = 0
+        
 
         # Carica i suoni
         self.sounds = {
@@ -182,9 +184,11 @@ class MainWindow(QWidget):
             color: #333333;
         """)
 
+        # Modello selezionabile
         self.model_selector = QComboBox()
-        self.model_selector.addItems(["Simple Model", "LSTM", "Transformers", "CNN 1D", "CNN 1D Sequential"])
+        self.model_selector.addItems(["Simple Model", "LSTM"])
         self.model_selector.setFont(QFont("Roboto", 14))
+        self.model_selector.currentIndexChanged.connect(self.load_model)
 
         layout = QVBoxLayout()
         layout.addWidget(self.model_selector)
@@ -196,33 +200,68 @@ class MainWindow(QWidget):
         self.timer.timeout.connect(self.update_data)
         self.timer.start(500)
 
+        # Variabili per il modello e la finestra temporale
+        self.model = None
+        self.scaler = None
+        self.window_size = 5
+        self.realtime_window = []
+
+        # Carica il modello iniziale
+        self.load_model()
+
+    def load_model(self):
+        selected_model = self.model_selector.currentText()
+        if selected_model == "Simple Model":
+            self.model = load_model("../Training_Data/models/0_simple_cnn_model.keras")
+            self.scaler = joblib.load("../Training_Data/models/0_simple_scaler.pkl")
+            print("Caricato modello semplice")
+        elif selected_model == "LSTM":
+            self.model = load_model("../Training_Data/models/1_lstm_model.keras")
+            self.scaler = joblib.load("../Training_Data/models/1_lstm_scaler.pkl")
+            self.realtime_window = []  # Reset della finestra temporale
+            self.time_idx_counter = 0 
+            print("Caricato modello LSTM")
+        elif selected_model == "Transformers":
+            self.model = load_model("../Training_Data/models/2_transformer_model.keras")
+            self.scaler = joblib.load("../Training_Data/models/2_transformers_scaler.pkl")
+            self.realtime_window = []  # Reset della finestra temporale
+            self.time_idx_counter = 0
+            print("Caricato modello Transformers")
+
     def update_data(self):
         telem = read_telemetry()
         graphics = read_graphics()
 
-        result = predict_realtime(telem, graphics)
-        print(result)
+        # Prepara i dati per la predizione
+        selected_model = self.model_selector.currentText()
+        if selected_model == "Simple Model":
+            processed_data = preprocess_realtime_data(telem, graphics, self.scaler, self.model_selector, self.time_idx_counter)
+        elif selected_model == "LSTM" or selected_model == "Transformers":
+            processed_data = preprocess_realtime_data_lstm(telem, graphics, self.scaler, self.realtime_window, self.window_size, self.model_selector, self.time_idx_counter)
 
-        slips = [telem["wheel_slip"][0],telem["wheel_slip"][1],telem["wheel_slip"][2],telem["wheel_slip"][3]] #[random.uniform(0, 0.7) for _ in range(4)]
-        label_pred = result
+        self.time_idx_counter += 1
 
-        self.visualizer.update_slips(slips)
+        if processed_data is not None:
+            result = predict_realtime(self.model, processed_data)
+            slips = [telem["wheel_slip"][0], telem["wheel_slip"][1], telem["wheel_slip"][2], telem["wheel_slip"][3]]
+            label_pred = result
 
-        label_text, label_color = LABEL_STATES[label_pred]
-        self.status_label.setText(f"{label_text}")
-        self.status_label.setStyleSheet(
-            f"""
-            background-color: #f0f4f8;
-            border: 2px solid #0078d7;
-            border-radius: 12px;
-            padding: 16px;
-            color: rgb({label_color.red()}, {label_color.green()}, {label_color.blue()});
-            """
-        )
+            self.visualizer.update_slips(slips)
 
-        
-        self.current_label_pred = label_pred
-        self.sounds[label_pred].play()
+            label_text, label_color = LABEL_STATES[label_pred]
+            self.status_label.setText(f"{label_text}")
+            self.status_label.setStyleSheet(
+                f"""
+                background-color: #f0f4f8;
+                border: 2px solid #0078d7;
+                border-radius: 12px;
+                padding: 16px;
+                color: rgb({label_color.red()}, {label_color.green()}, {label_color.blue()});
+                """
+            )
+
+            self.current_label_pred = label_pred
+            self.sounds[label_pred].play()
 
 def convert_to_milliseconds(time_str: str) -> int:
     parts = time_str.split(":")
@@ -236,7 +275,7 @@ def convert_to_milliseconds(time_str: str) -> int:
     total_milliseconds = (minutes * 60 * 1000) + (seconds * 1000) + milliseconds
     return total_milliseconds
 
-def preprocess_realtime_data(telem, graphics):
+def preprocess_realtime_data(telem, graphics, scaler, model_selector, time_idx_counter):
     data = {
         "gas": telem["gas"],
         "brake": telem["brake"],
@@ -263,6 +302,9 @@ def preprocess_realtime_data(telem, graphics):
         "current_time": convert_to_milliseconds(graphics["current_time_str"].rstrip('\x00')),
     }
 
+    if model_selector.currentText() != "Simple Model":
+        data["time_idx"] = time_idx_counter
+
     df = pd.DataFrame([data])
 
     # Applica lo scaler al dataframe
@@ -271,11 +313,26 @@ def preprocess_realtime_data(telem, graphics):
     # Restituisci i dati trasformati come array NumPy
     return scaled_features
 
+def preprocess_realtime_data_lstm(telem, graphics, scaler, realtime_window, window_size, model_selector, time_idx_counter):
+    # Preprocessa i dati come per il modello semplice
+    processed_data = preprocess_realtime_data(telem, graphics, scaler, model_selector, time_idx_counter)
 
-def predict_realtime(telem, graphics):
-    processed_data = preprocess_realtime_data(telem, graphics)
+    # Aggiungi i dati alla finestra temporale
+    realtime_window.append(processed_data[0])
+    if len(realtime_window) < window_size:
+        return None  # Non abbastanza dati per una finestra completa
+
+    # Mantieni solo gli ultimi `window_size` elementi
+    realtime_window = realtime_window[-window_size:]
+
+    # Converte la finestra in un array NumPy 3D
+    return np.array([realtime_window])
+
+
+def predict_realtime(model, processed_data):
     prediction = model.predict(processed_data, verbose=0)
     predicted_class = np.argmax(prediction, axis=1)[0]
+    print(predicted_class)
     return predicted_class
 
 if __name__ == "__main__":

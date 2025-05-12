@@ -35,6 +35,7 @@ for i, class_name in enumerate(result_classes):
 df["track"] = LabelEncoder().fit_transform(df["track"])
 df["driver"] = LabelEncoder().fit_transform(df["driver"])
 df["temp"] = LabelEncoder().fit_transform(df["temp"])
+df["time_idx"] = df.groupby(["track", "driver", "temp"]).cumcount()
 
 # === Selezione feature numeriche + scaling ===
 feature_cols = [col for col in df.columns if col not in ["track", "driver", "temp", "result"]]
@@ -43,8 +44,6 @@ df[feature_cols] = scaler.fit_transform(df[feature_cols])
 joblib.dump(scaler, "./models/1_lstm_scaler.pkl")
 
 
-# Aggiunta colonna time_idx per ogni sessione
-df["time_idx"] = df.groupby(["track", "driver", "temp"]).cumcount()
 
 # Creazione delle sequenze temporali
 group_cols = ["track", "driver", "temp"]
