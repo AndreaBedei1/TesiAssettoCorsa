@@ -35,6 +35,8 @@ Esporre i dati con websoket per rimplementarla con html css
 
 Controlla velocità se sotto tot metti neutro
 
+Filtra per la rete valori alti di slip, riportali a 5
+
 
 
 

@@ -17,10 +17,13 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from env.shared_memory_physics import read_telemetry
 from env.shared_memory_graphics import read_graphics
-
+from training_data.r1 import ResNet1DTabular
+from training_data.r1s import ResNet1D
 
 model = load_model("../Training_Data/models/0_simple_cnn_model.keras")
 scaler = joblib.load("../Training_Data/models/0_simple_scaler.pkl")
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../training_data')))
 
 
 
@@ -230,16 +233,16 @@ class MainWindow(QWidget):
             self.time_idx_counter = 0
             print("Caricato modello Transformers")
         elif selected_model == "ResNet1D":
-            self.model = ResNet1DTabular()  # Ricostruisci il modello
-            self.model.load_state_dict(torch.load("../Training_Data/models/resnet1d_model.pth"))
-            self.model.eval() 
-            self.scaler = joblib.load("../Training_Data/models/1_resnet_scaler.pkl")
+            # Carica il modello completo salvato come file
+            self.model = torch.load("../Training_Data/models/3_resnet_full_model.pth", weights_only=False)
+            self.model.eval()  # Imposta il modello in modalità di inferenza
+            self.scaler = joblib.load("../Training_Data/models/3_resnet_scaler.pkl")
             print("Caricato modello ResNet1D")
         elif selected_model == "ResNet1D Sequence":
-            self.model = ResNet1D()
-            self.model.load_state_dict(torch.load("../Training_Data/models/resnet1d_sequence_model.pth"))
+            # Carica il modello completo salvato come file
+            self.model = torch.load("../Training_Data/models/4_resnet_seq_full_model.pth", weights_only=False)
             self.model.eval()  # Imposta il modello in modalità di inferenza
-            self.scaler = joblib.load("../Training_Data/models/resnet1d_sequence_scaler.pkl")
+            self.scaler = joblib.load("../Training_Data/models/4_resnet1d_sequence_scaler.pkl")
             self.realtime_window = []  # Reset della finestra temporale
             self.time_idx_counter = 0
             print("Caricato modello ResNet1D Sequence")
@@ -248,6 +251,7 @@ class MainWindow(QWidget):
         telem = read_telemetry()
         graphics = read_graphics()
 
+        label_pred = 3
         if telem["speed"] < 20:
             label_pred = 3
         else:

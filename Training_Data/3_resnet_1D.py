@@ -8,13 +8,13 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.utils.class_weight import compute_class_weight
 
 
 from preprocess_dataset import fix_dataset, load_telemetry_data
 from custom_early_stop import CustomEarlyStoppingTorch
+from r1 import ResNet1DTabular
 
 # === Config ===
 split_by_circuit = True
@@ -48,7 +48,7 @@ df["time_idx"] = df.groupby(["track", "driver", "temp"]).cumcount()
 feature_cols = [col for col in df.columns if col not in ["track", "driver", "temp", "result"]]
 scaler = StandardScaler()
 df[feature_cols] = scaler.fit_transform(df[feature_cols])
-joblib.dump(scaler, "./models/1_resnet_scaler.pkl")
+joblib.dump(scaler, "./models/3_resnet_scaler.pkl")
 
 # === Split ===
 if split_by_circuit:
@@ -85,39 +85,7 @@ val_loader = DataLoader(TensorDataset(X_val_tensor, y_val_tensor), batch_size=ba
 test_loader = DataLoader(TensorDataset(X_test_tensor, y_test_tensor), batch_size=batch_size)
 
 # === Model ===
-class ResidualBlock(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.block = nn.Sequential(
-            nn.Linear(dim, dim),
-            nn.BatchNorm1d(dim),
-            nn.ReLU(),
-            nn.Linear(dim, dim),
-            nn.BatchNorm1d(dim)
-        )
 
-    def forward(self, x):
-        return F.relu(x + self.block(x))
-
-class ResNet1DTabular(nn.Module):
-    def __init__(self, input_dim, num_classes, depth=3):
-        super().__init__()
-        self.input_layer = nn.Sequential(
-            nn.Linear(input_dim, 128),
-            nn.ReLU(),
-            nn.BatchNorm1d(128)
-        )
-        self.res_blocks = nn.Sequential(*[ResidualBlock(128) for _ in range(depth)])
-        self.output_layer = nn.Sequential(
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_classes)
-        )
-
-    def forward(self, x):
-        x = self.input_layer(x)
-        x = self.res_blocks(x)
-        return self.output_layer(x)
 
 # === Training ===
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -180,6 +148,9 @@ for epoch in range(num_epochs):
     if early_stopper.early_stop:
         print("Early stopping triggered.")
         break
+
+torch.save(model, "./models/3_resnet_full_model.pth")
+print("Modello salvato come './models/3_resnet_full_model.pth'")
 
 # === Evaluation ===
 model.eval()
