@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, QTimer, QUrl
 from PyQt5.QtMultimedia import QSoundEffect
 
 from keras.models import load_model
+import torch
 import joblib
 import numpy as np
 import pandas as pd
@@ -14,9 +15,9 @@ import pandas as pd
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from env.shared_memory_physics import read_telemetry
 from env.shared_memory_graphics import read_graphics
+
 
 model = load_model("../Training_Data/models/0_simple_cnn_model.keras")
 scaler = joblib.load("../Training_Data/models/0_simple_scaler.pkl")
@@ -42,6 +43,7 @@ class WheelVisualizer(QWidget):
         self.slips = [0.0] * 4
         self.setMinimumSize(400, 300)
         self.setStyleSheet("background-color: #f3e8d3; border: 2px solid #a18860;")
+
 
     def update_slips(self, slips):
         self.slips = slips
@@ -108,6 +110,8 @@ class MainWindow(QWidget):
 
         self.current_label_pred = None  # salva l'ultima label mostrata
         self.time_idx_counter = 0
+        self.slip_window = [[], [], [], []]
+
         
 
         # Carica i suoni
@@ -186,7 +190,7 @@ class MainWindow(QWidget):
 
         # Modello selezionabile
         self.model_selector = QComboBox()
-        self.model_selector.addItems(["Simple Model", "LSTM", "Transformers"])
+        self.model_selector.addItems(["Simple Model", "LSTM", "Transformers", "ResNet1D", "ResNet1D Sequence"])
         self.model_selector.setFont(QFont("Roboto", 14))
         self.model_selector.currentIndexChanged.connect(self.load_model)
 
@@ -198,15 +202,13 @@ class MainWindow(QWidget):
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(500)
+        self.timer.start(150)
 
-        # Variabili per il modello e la finestra temporale
         self.model = None
         self.scaler = None
         self.window_size = 5
         self.realtime_window = []
 
-        # Carica il modello iniziale
         self.load_model()
 
     def load_model(self):
@@ -219,7 +221,7 @@ class MainWindow(QWidget):
             self.model = load_model("../Training_Data/models/1_lstm_model.keras")
             self.scaler = joblib.load("../Training_Data/models/1_lstm_scaler.pkl")
             self.realtime_window = []  # Reset della finestra temporale
-            self.time_idx_counter = 0 
+            self.time_idx_counter = 0
             print("Caricato modello LSTM")
         elif selected_model == "Transformers":
             self.model = load_model("../Training_Data/models/2_transformer_model.keras")
@@ -227,42 +229,72 @@ class MainWindow(QWidget):
             self.realtime_window = []  # Reset della finestra temporale
             self.time_idx_counter = 0
             print("Caricato modello Transformers")
+        elif selected_model == "ResNet1D":
+            self.model = ResNet1DTabular()  # Ricostruisci il modello
+            self.model.load_state_dict(torch.load("../Training_Data/models/resnet1d_model.pth"))
+            self.model.eval() 
+            self.scaler = joblib.load("../Training_Data/models/1_resnet_scaler.pkl")
+            print("Caricato modello ResNet1D")
+        elif selected_model == "ResNet1D Sequence":
+            self.model = ResNet1D()
+            self.model.load_state_dict(torch.load("../Training_Data/models/resnet1d_sequence_model.pth"))
+            self.model.eval()  # Imposta il modello in modalità di inferenza
+            self.scaler = joblib.load("../Training_Data/models/resnet1d_sequence_scaler.pkl")
+            self.realtime_window = []  # Reset della finestra temporale
+            self.time_idx_counter = 0
+            print("Caricato modello ResNet1D Sequence")
 
     def update_data(self):
         telem = read_telemetry()
         graphics = read_graphics()
 
-        # Prepara i dati per la predizione
-        selected_model = self.model_selector.currentText()
-        if selected_model == "Simple Model":
-            processed_data = preprocess_realtime_data(telem, graphics, self.scaler, self.model_selector, self.time_idx_counter)
-        elif selected_model == "LSTM" or selected_model == "Transformers":
-            processed_data = preprocess_realtime_data_lstm(telem, graphics, self.scaler, self.realtime_window, self.window_size, self.model_selector, self.time_idx_counter)
+        if telem["speed"] < 20:
+            label_pred = 3
+        else:
+            selected_model = self.model_selector.currentText()
+            if selected_model == "Simple Model":
+                processed_data = preprocess_realtime_data(telem, graphics, self.scaler, self.model_selector, self.time_idx_counter)
+            elif selected_model == "LSTM" or selected_model == "Transformers":
+                processed_data = preprocess_realtime_data_lstm(telem, graphics, self.scaler, self.realtime_window, self.window_size, self.model_selector, self.time_idx_counter)
+            elif selected_model == "ResNet1D":
+                processed_data = preprocess_realtime_data(telem, graphics, self.scaler, self.model_selector, self.time_idx_counter)
+            elif selected_model == "ResNet1D Sequence":
+                processed_data = preprocess_realtime_data_resnet_sequence(telem, graphics, self.scaler, self.realtime_window, self.window_size, self.model_selector, self.time_idx_counter)
 
-        self.time_idx_counter += 1
+            self.time_idx_counter += 1
 
-        if processed_data is not None:
-            result = predict_realtime(self.model, processed_data)
-            print(f"Predizione: {result}")
-            slips = [telem["wheel_slip"][0], telem["wheel_slip"][1], telem["wheel_slip"][2], telem["wheel_slip"][3]]
-            label_pred = result
+            if processed_data is not None:
+                if "ResNet" in selected_model:
+                    processed_data = torch.tensor(processed_data, dtype=torch.float32).to("cuda" if torch.cuda.is_available() else "cpu")
+                    result = self.model(processed_data).argmax(dim=1).item()
+                else:
+                    result = predict_realtime(self.model, processed_data)
+                label_pred = result
 
-            self.visualizer.update_slips(slips)
 
-            label_text, label_color = LABEL_STATES[label_pred]
-            self.status_label.setText(f"{label_text}")
-            self.status_label.setStyleSheet(
-                f"""
-                background-color: #f0f4f8;
-                border: 2px solid #0078d7;
-                border-radius: 12px;
-                padding: 16px;
-                color: rgb({label_color.red()}, {label_color.green()}, {label_color.blue()});
-                """
-            )
+        for i in range(4):
+            self.slip_window[i].append(telem["wheel_slip"][i])
+            if len(self.slip_window[i]) > 8:
+                self.slip_window[i].pop(0)
 
-            self.current_label_pred = label_pred
-            self.sounds[label_pred].play()
+        slips = [sum(self.slip_window[i]) / len(self.slip_window[i]) for i in range(4)]
+
+        self.visualizer.update_slips(slips)
+
+        label_text, label_color = LABEL_STATES[label_pred]
+        self.status_label.setText(f"{label_text}")
+        self.status_label.setStyleSheet(
+            f"""
+            background-color: #f0f4f8;
+            border: 2px solid #0078d7;
+            border-radius: 12px;
+            padding: 16px;
+            color: rgb({label_color.red()}, {label_color.green()}, {label_color.blue()});
+            """
+        )
+
+        self.current_label_pred = label_pred
+        self.sounds[label_pred].play()
 
 def convert_to_milliseconds(time_str: str) -> int:
     parts = time_str.split(":")
@@ -307,31 +339,30 @@ def preprocess_realtime_data(telem, graphics, scaler, model_selector, time_idx_c
         data["time_idx"] = time_idx_counter
 
     df = pd.DataFrame([data])
-
-    # Applica lo scaler al dataframe
     scaled_features = scaler.transform(df)
-
-    # Restituisci i dati trasformati come array NumPy
     return scaled_features
 
 def preprocess_realtime_data_lstm(telem, graphics, scaler, realtime_window, window_size, model_selector, time_idx_counter):
-    # Preprocessa i dati come per il modello semplice
     processed_data = preprocess_realtime_data(telem, graphics, scaler, model_selector, time_idx_counter)
-
-    # Aggiungi i dati alla finestra temporale
     realtime_window.append(processed_data[0])
     if len(realtime_window) < window_size:
-        return None  # Non abbastanza dati per una finestra completa
+        return None  
 
-    # Mantieni solo gli ultimi `window_size` elementi
     realtime_window = realtime_window[-window_size:]
+    return np.array([realtime_window])
 
-    # Converte la finestra in un array NumPy 3D
+def preprocess_realtime_data_resnet_sequence(telem, graphics, scaler, realtime_window, window_size, model_selector, time_idx_counter):
+    processed_data = preprocess_realtime_data(telem, graphics, scaler, model_selector, time_idx_counter)
+    realtime_window.append(processed_data[0])
+    if len(realtime_window) < window_size:
+        return None 
+
+    realtime_window = realtime_window[-window_size:]
     return np.array([realtime_window])
 
 
 def predict_realtime(model, processed_data):
-    prediction = model.predict(processed_data, verbose=0)
+    prediction = model.predict(processed_data, verbose=1)
     predicted_class = np.argmax(prediction, axis=1)[0]
     return predicted_class
 

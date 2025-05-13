@@ -31,5 +31,11 @@ Sviluppi futuri, provare con pneumatici diversi -> molto importante
 
 
 
+Esporre i dati con websoket per rimplementarla con html css
+
+Controlla velocità se sotto tot metti neutro
+
+
+
 
 
