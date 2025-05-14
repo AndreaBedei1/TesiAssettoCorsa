@@ -10,6 +10,8 @@ from sklearn.utils.class_weight import compute_class_weight
 from sklearn.utils import shuffle
 from preprocess_dataset import fix_dataset, load_telemetry_data
 from custom_early_stop import CustomEarlyStopping
+from keras.layers import BatchNormalization
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 import joblib
@@ -32,7 +34,7 @@ os.environ["VECLIB_MAXIMUM_THREADS"] = "0"
 os.environ["NUMEXPR_NUM_THREADS"] = "0"
 
 # === Configurazione iniziale ===
-split_by_circuit = False  # Non usiamo split per circuito
+split_by_circuit = True  # Non usiamo split per circuito
 random_state = 42  # Per riproducibilità
 
 # === Caricamento e preprocessing ===
@@ -114,12 +116,25 @@ X_train, y_train = shuffle(X_train, y_train, random_state=random_state)
 
 # === Modello ===
 model = Sequential([
-    Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
-    Dropout(0.2),
+    Dense(256, activation='relu', input_shape=(X_train.shape[1],)),
+    BatchNormalization(),
+    Dropout(0.3),
+    
+    Dense(128, activation='relu'),
+    BatchNormalization(),
+    Dropout(0.3),
+    
     Dense(64, activation='relu'),
+    BatchNormalization(),
+    Dropout(0.2),
+    
     Dense(32, activation='relu'),
-    Dense(4, activation='softmax')
+    BatchNormalization(),
+    Dropout(0.2),
+    
+    Dense(4, activation='softmax')  # Numero di classi
 ])
+
 
 model.compile(
     optimizer='adam',
@@ -139,7 +154,7 @@ custom_early_stopping = CustomEarlyStopping(validation_data=(X_val, y_val), pati
 history = model.fit(
     X_train, y_train,
     validation_data=(X_val, y_val),
-    epochs=50,
+    epochs=100,
     batch_size=64,
     callbacks=[custom_early_stopping],
     class_weight=class_weights_dict,
