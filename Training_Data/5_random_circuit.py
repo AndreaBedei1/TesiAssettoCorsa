@@ -1,3 +1,6 @@
+#### python
+# filepath: c:\Users\Andrea\Desktop\TesiAssettoCorsa\training_data\5_random.py
+# ...existing code...
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -17,13 +20,6 @@ import joblib
 import tensorflow as tf
 from tensorflow.config import threading
 
-# Configura TensorFlow per utilizzare tutti i processori disponibili
-num_threads = tf.config.threading.get_intra_op_parallelism_threads()
-print(f"Numero di thread disponibili: {num_threads}")
-
-tf.config.threading.set_intra_op_parallelism_threads(0)  # 0 significa "usa tutti i thread disponibili"
-tf.config.threading.set_inter_op_parallelism_threads(0)
-
 import os
 os.environ["OMP_NUM_THREADS"] = "0"  # 0 significa "usa tutti i thread disponibili"
 os.environ["OPENBLAS_NUM_THREADS"] = "0"
@@ -32,8 +28,7 @@ os.environ["VECLIB_MAXIMUM_THREADS"] = "0"
 os.environ["NUMEXPR_NUM_THREADS"] = "0"
 
 # === Configurazione iniziale ===
-split_by_circuit = False  # Non usiamo split per circuito
-random_state = 42  # Per riproducibilità
+random_state = 20  # Per riproducibilità
 
 # === Caricamento e preprocessing ===
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
@@ -50,52 +45,55 @@ print("Mappatura delle classi:")
 for i, class_name in enumerate(result_classes):
     print(f"{i}: {class_name}")
 
-# Encoding altre colonne categoriali
-df["track"] = LabelEncoder().fit_transform(df["track"])
-df["driver"] = LabelEncoder().fit_transform(df["driver"])
-df["temp"] = LabelEncoder().fit_transform(df["temp"])
+# Supponendo tu abbia una colonna 'track_name' con il nome reale del circuito:
+df_mugello = df[df["track"] == "mugello"]
+df_rest = df[df["track"] != "mugello"]
 
 # Selezione feature numeriche + scaling
-feature_cols = [col for col in df.columns if col not in ["track", "driver", "temp", "result"]]
+feature_cols = [col for col in df_rest.columns if col not in ["track", "driver", "temp", "result"]]
 scaler = StandardScaler()
-df[feature_cols] = scaler.fit_transform(df[feature_cols])
+
+# Fit dello scaler solo sul sottoinsieme di train/val
+df_rest[feature_cols] = scaler.fit_transform(df_rest[feature_cols])
 joblib.dump(scaler, "./models/0_simple_scaler_random.pkl")
 
-# === Split casuale dei dati ===
-X = df[feature_cols]
-y = to_categorical(df["result"], num_classes=4)
+# Prepariamo X e y per df_rest (train/val)
+X_rest = df_rest[feature_cols]
+y_rest = to_categorical(df_rest["result"], num_classes=4)
 
-X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_state=random_state, stratify=df["result"])
-X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=random_state, stratify=np.argmax(y_temp, axis=1))
+# Prepariamo X e y per df_mugello (test)
+# Applichiamo lo stesso scaler su Mugello
+df_mugello[feature_cols] = scaler.transform(df_mugello[feature_cols])
+X_mugello = df_mugello[feature_cols]
+y_mugello = to_categorical(df_mugello["result"], num_classes=4)
 
-# === Data Augmentation ===
-# === Data Augmentation ===
-# Identifica le classi sottorappresentate
+# Split train/val
+X_train, X_val, y_train, y_val = train_test_split(
+    X_rest, y_rest, test_size=0.3, random_state=random_state, stratify=df_rest["result"]
+)
+
+# Data Augmentation solo sul training
 class_counts = np.sum(y_train, axis=0)
 max_count = np.max(class_counts)
 
 augmented_X, augmented_y = [], []
-augmentation_limit = 10000  # Limite massimo di esempi aggiunti per evitare problemi di memoria
+augmentation_limit = 10000  # Limite di esempi per evitare problemi di memoria
 
 for i, count in enumerate(class_counts):
     if count < max_count:
-        # Filtra i dati della classe sottorappresentata
         class_indices = np.where(np.argmax(y_train, axis=1) == i)[0]
         class_X = X_train.iloc[class_indices]
         class_y = y_train[class_indices]
 
-        # Calcola il numero di duplicazioni necessarie
         num_to_add = max_count - count
         num_added = 0
 
-        # Duplica i dati fino a raggiungere il numero massimo o il limite
         while num_added < num_to_add and len(augmented_X) < augmentation_limit:
             augmented_X.append(class_X)
             augmented_y.append(class_y)
             num_added += len(class_X)
-            class_X = class_X.sample(frac=1, replace=True, random_state=random_state)  # Shuffle
+            class_X = class_X.sample(frac=1, replace=True, random_state=random_state)
 
-# Combina i dati originali con quelli aumentati
 if augmented_X:
     augmented_X = pd.concat(augmented_X, axis=0)
     augmented_y = np.vstack(augmented_y)
@@ -103,16 +101,15 @@ if augmented_X:
     X_train = pd.concat([X_train, augmented_X], axis=0)
     y_train = np.vstack([y_train, augmented_y])
 
-# Conta il numero di etichette per classe dopo la data augmentation
-class_distribution = np.bincount(np.argmax(y_train, axis=1))
-print("Distribuzione delle classi dopo la data augmentation:")
-for i, count in enumerate(class_distribution):
-    print(f"Classe {i} ({result_classes[i]}): {count} esempi")
-
 # Shuffle finale
 X_train, y_train = shuffle(X_train, y_train, random_state=random_state)
 
-# === Modello ===
+print("Distribuzione delle classi (train) dopo la data augmentation:")
+class_distribution = np.bincount(np.argmax(y_train, axis=1))
+for i, ccount in enumerate(class_distribution):
+    print(f"Classe {i} ({result_classes[i]}): {ccount} esempi")
+
+# Definizione modello
 model = Sequential([
     Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
     Dropout(0.2),
@@ -127,7 +124,8 @@ model.compile(
     metrics=['accuracy']
 )
 
-class_weights = compute_class_weight(
+from sklearn.utils import class_weight
+class_weights = class_weight.compute_class_weight(
     class_weight="balanced",
     classes=np.unique(np.argmax(y_train, axis=1)),
     y=np.argmax(y_train, axis=1)
@@ -148,23 +146,24 @@ history = model.fit(
 
 model.save("./models/0_simple_cnn_model_random_augmented.keras")
 
-test_loss, test_acc = model.evaluate(X_test, y_test)
-print(f"Overall Test accuracy: {test_acc:.2f}")
+# Valutazione sul test (Mugello)
+test_loss, test_acc = model.evaluate(X_mugello, y_mugello)
+print(f"Overall Test accuracy su Mugello: {test_acc:.2f}")
 
-y_pred = model.predict(X_test)
+y_pred = model.predict(X_mugello)
 y_pred_classes = np.argmax(y_pred, axis=1)
-y_true_classes = np.argmax(y_test, axis=1)
+y_true_classes = np.argmax(y_mugello, axis=1)
 
 report = classification_report(y_true_classes, y_pred_classes, target_names=result_classes, output_dict=True, zero_division=0)
 for label, metrics in report.items():
-    if isinstance(metrics, dict):  # Skip overall metrics like 'accuracy'
-        print(f"precision for label '{label}': {metrics['precision']:.2f}")
+    if isinstance(metrics, dict):
+        print(f"Precisione per la classe '{label}': {metrics['precision']:.2f}")
 
 conf_matrix = confusion_matrix(y_true_classes, y_pred_classes, normalize='true')
 
 plt.figure(figsize=(10, 8))
 sns.heatmap(conf_matrix, annot=True, fmt='.2f', cmap='Blues', xticklabels=result_classes, yticklabels=result_classes)
-plt.title('Normalized Confusion Matrix')
+plt.title('Normalized Confusion Matrix (Mugello)')
 plt.xlabel('Predicted Labels')
 plt.ylabel('True Labels')
 plt.show()
@@ -192,3 +191,4 @@ plt.grid()
 
 plt.tight_layout()
 plt.show()
+# ...existing code...

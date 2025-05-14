@@ -17,7 +17,7 @@ from custom_early_stop import CustomEarlyStoppingTorch
 from r1 import ResNet1DTabular
 
 # === Config ===
-split_by_circuit = True
+split_by_circuit = False
 batch_size = 64
 num_epochs = 100
 patience = 7
@@ -71,6 +71,7 @@ else:
     X_train, y_train = X[:split1], y[:split1]
     X_val, y_val = X[split1:split2], y[split1:split2]
     X_test, y_test = X[split2:], y[split2:]
+
 
 # === Tensors and Dataloaders ===
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)

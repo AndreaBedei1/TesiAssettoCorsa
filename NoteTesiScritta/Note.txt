@@ -25,14 +25,3 @@ Sono state fatte anche prove su un periodo molto più lungo in modo tale da osse
 
 
 Sviluppi futuri, provare con pneumatici diversi -> molto importante
-
-
-
-
-Esporre i dati con websoket per rimplementarla con html css
-
-
-
-
-
-

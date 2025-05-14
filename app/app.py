@@ -29,10 +29,6 @@ scaler = joblib.load("../Training_Data/models/0_simple_scaler.pkl")
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../training_data')))
 
-
-
-
-# Lista dei client connessi
 connected_clients = set()
 
 async def websocket_handler(websocket, path):
@@ -74,8 +70,8 @@ LABEL_STATES = {
 
 def interpolate_color(value, max_val=1.0):
     ratio = min(max(value / max_val, 0.0), 1.0)
-    hue = (120 - 120 * ratio) / 360.0  # green to red
-    color = QColor.fromHsvF(hue, 0.85, 0.9)  # più desaturato, stile vintage
+    hue = (120 - 120 * ratio) / 360.0 
+    color = QColor.fromHsvF(hue, 0.85, 0.9) 
     return color
 
 class WheelVisualizer(QWidget):
@@ -149,7 +145,7 @@ class MainWindow(QWidget):
 
         self.setWindowIcon(QIcon("img.png"))
 
-        self.current_label_pred = None  # salva l'ultima label mostrata
+        self.current_label_pred = None
         self.time_idx_counter = 0
         self.slip_window = [[], [], [], []]
 
@@ -229,7 +225,6 @@ class MainWindow(QWidget):
             color: #333333;
         """)
 
-        # Modello selezionabile
         self.model_selector = QComboBox()
         self.model_selector.addItems(["Simple Model", "LSTM", "Transformers", "ResNet1D", "ResNet1D Sequence"])
         self.model_selector.setFont(QFont("Roboto", 14))
@@ -261,27 +256,27 @@ class MainWindow(QWidget):
         elif selected_model == "LSTM":
             self.model = load_model("../Training_Data/models/1_lstm_model.keras")
             self.scaler = joblib.load("../Training_Data/models/1_lstm_scaler.pkl")
-            self.realtime_window = []  # Reset della finestra temporale
+            self.realtime_window = [] 
             self.time_idx_counter = 0
             print("Caricato modello LSTM")
         elif selected_model == "Transformers":
             self.model = load_model("../Training_Data/models/2_transformer_model.keras")
             self.scaler = joblib.load("../Training_Data/models/2_transformers_scaler.pkl")
-            self.realtime_window = []  # Reset della finestra temporale
+            self.realtime_window = [] 
             self.time_idx_counter = 0
             print("Caricato modello Transformers")
         elif selected_model == "ResNet1D":
             # Carica il modello completo salvato come file
             self.model = torch.load("../Training_Data/models/3_resnet_full_model.pth", weights_only=False)
-            self.model.eval()  # Imposta il modello in modalità di inferenza
+            self.model.eval()  
             self.scaler = joblib.load("../Training_Data/models/3_resnet_scaler.pkl")
             print("Caricato modello ResNet1D")
         elif selected_model == "ResNet1D Sequence":
             # Carica il modello completo salvato come file
             self.model = torch.load("../Training_Data/models/4_resnet_seq_full_model.pth", weights_only=False)
-            self.model.eval()  # Imposta il modello in modalità di inferenza
+            self.model.eval()  
             self.scaler = joblib.load("../Training_Data/models/4_resnet1d_sequence_scaler.pkl")
-            self.realtime_window = []  # Reset della finestra temporale
+            self.realtime_window = [] 
             self.time_idx_counter = 0
             print("Caricato modello ResNet1D Sequence")
 
@@ -359,9 +354,9 @@ def preprocess_realtime_data(telem, graphics, scaler, model_selector, time_idx_c
         "rpm": telem["rpm"],
         "steer": telem["steer"],
         "speed": telem["speed"],
-        "g_force_x": telem["g_force"][2],  # Inversione a causa di un bug
-        "g_force_y": telem["g_force"][0],  # Inversione a causa di un bug
-        "g_force_z": telem["g_force"][1],  # Inversione a causa di un bug
+        "g_force_x": telem["g_force"][2],
+        "g_force_y": telem["g_force"][0], 
+        "g_force_z": telem["g_force"][1],  
         "pressure_front_left": telem["pressure"][0],
         "pressure_front_right": telem["pressure"][1],
         "pressure_rear_left": telem["pressure"][2],
