@@ -36,17 +36,15 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../trai
 connected_clients = set()
 
 async def websocket_handler(websocket, path):
-    # Aggiungi il client alla lista dei connessi
     connected_clients.add(websocket)
     try:
         async for message in websocket:
-            pass  # Il server non riceve messaggi, solo invia
+            pass
     finally:
-        # Rimuovi il client dalla lista quando si disconnette
         connected_clients.remove(websocket)
 
 async def send_data(label_pred, slips):
-    if connected_clients:  # Invia solo se ci sono client connessi
+    if connected_clients:
         data = {
             "label_pred": label_pred,
             "slips": slips
@@ -55,12 +53,17 @@ async def send_data(label_pred, slips):
         await asyncio.wait([client.send(message) for client in connected_clients])
 
 def start_websocket_server():
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    loop = asyncio.get_event_loop()
-    start_server = websockets.serve(websocket_handler, "localhost", 8765)
-    loop.run_until_complete(start_server)
-    loop.run_forever()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
+    async def run_server():
+        server = await websockets.serve(websocket_handler, "localhost", 8765)
+        print("WebSocket server avviato su ws://localhost:8765")
+        await server.wait_closed()
+
+    # Esegui la coroutine
+    loop.run_until_complete(run_server())
+    loop.run_forever()
 
 LABEL_STATES = {
     0: ("Grip Loss", QColor(255, 0, 0)),
@@ -408,8 +411,8 @@ def predict_realtime(model, processed_data):
     return predicted_class
 
 if __name__ == "__main__":
-    websocket_thread = threading.Thread(target=start_websocket_server, daemon=True)
-    websocket_thread.start()
+    threading.Thread(target=start_websocket_server, daemon=True).start()
+    
     app = QApplication(sys.argv)
     win = MainWindow()
     win.show()
