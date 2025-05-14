@@ -17,8 +17,6 @@ Crrazione dataset:
 
 
 Continua a prendere il dataset
-Descrivi dati singoli di Mattina nella parte data analysis, iniziare con mockup e parte della interfaccia
-
 
 Altra cosa: per quanto riguarda il consumo gomme, sono stati fatti test da 5 minuti i quali si ha un usura minima, questo perchè una gara di guida autonoma per il momento non prevede un gran numero di giri.
 Sono state fatte anche prove su un periodo molto più lungo in modo tale da osservare l'usura nel tempo degli pneumatici
@@ -33,9 +31,6 @@ Sviluppi futuri, provare con pneumatici diversi -> molto importante
 
 Esporre i dati con websoket per rimplementarla con html css
 
-Controlla velocità se sotto tot metti neutro
-
-Filtra per la rete valori alti di slip, riportali a 5
 
 
 

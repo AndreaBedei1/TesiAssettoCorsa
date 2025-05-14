@@ -87,9 +87,10 @@ Con pesi modificati, per dare più peso alle classi con meno record (foto) .76 g
 Epoch 20: Mean Precision = 0.6663
 1124/1124 ━━━━━━━━━━━━━━━━━━━━ 4s 3ms/step - accuracy: 0.9403 - loss: 0.2150 - val_accuracy: 0.8861 - val_loss: 0.3665
 
-Precision for label 'grip_loss': 0.54
-Precision for label 'high_grip_accelerate': 0.88
-Precision for label 'low_grip_accelerate': 0.71
-Precision for label 'neutral': 0.99
-Accuracy for label 'macro avg': 0.78
-Accuracy for label 'weighted avg': 0.92
+W1
+Accuracy for label 'grip_loss': 0.71
+Accuracy for label 'high_grip_accelerate': 0.87
+Accuracy for label 'low_grip_accelerate': 0.79
+Accuracy for label 'neutral': 1.00
+Accuracy for label 'macro avg': 0.84
+Accuracy for label 'weighted avg': 0.93

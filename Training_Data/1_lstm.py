@@ -14,7 +14,7 @@ import joblib
 
 # === Configurazione iniziale ===
 split_by_circuit = True
-window_size = 5
+window_size = 3
 
 # === Caricamento e preprocessing ===
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
@@ -86,8 +86,8 @@ else:
 
 # === Calcolo class weights ===
 y_train_labels = np.argmax(y_train, axis=1)
-# class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_train_labels), y=y_train_labels)
-# class_weights_dict = dict(enumerate(class_weights))
+class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_train_labels), y=y_train_labels)
+class_weights_dict = dict(enumerate(class_weights))
 
 custom_early_stopping = CustomEarlyStopping(validation_data=(X_val, y_val), patience=7)
 

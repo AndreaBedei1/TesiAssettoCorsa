@@ -102,7 +102,7 @@ history = model.fit(
     batch_size=64,
     callbacks=[custom_early_stopping],
     class_weight=class_weights_dict,
-    verbose=1
+    verbose=0
 )
 
 model.save("./models/0_simple_cnn_model.keras")

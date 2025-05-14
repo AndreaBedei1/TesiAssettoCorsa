@@ -14,6 +14,10 @@ import pandas as pd
 
 import sys
 import os
+import asyncio
+import websockets
+import threading
+import json
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from env.shared_memory_physics import read_telemetry
 from env.shared_memory_graphics import read_graphics
@@ -25,6 +29,37 @@ scaler = joblib.load("../Training_Data/models/0_simple_scaler.pkl")
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../training_data')))
 
+
+
+
+# Lista dei client connessi
+connected_clients = set()
+
+async def websocket_handler(websocket, path):
+    # Aggiungi il client alla lista dei connessi
+    connected_clients.add(websocket)
+    try:
+        async for message in websocket:
+            pass  # Il server non riceve messaggi, solo invia
+    finally:
+        # Rimuovi il client dalla lista quando si disconnette
+        connected_clients.remove(websocket)
+
+async def send_data(label_pred, slips):
+    if connected_clients:  # Invia solo se ci sono client connessi
+        data = {
+            "label_pred": label_pred,
+            "slips": slips
+        }
+        message = json.dumps(data)
+        await asyncio.wait([client.send(message) for client in connected_clients])
+
+def start_websocket_server():
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    loop = asyncio.get_event_loop()
+    start_server = websockets.serve(websocket_handler, "localhost", 8765)
+    loop.run_until_complete(start_server)
+    loop.run_forever()
 
 
 LABEL_STATES = {
@@ -250,6 +285,7 @@ class MainWindow(QWidget):
     def update_data(self):
         telem = read_telemetry()
         graphics = read_graphics()
+        label_pred = 0
 
         label_pred = 3
         if telem["speed"] < 20:
@@ -299,6 +335,7 @@ class MainWindow(QWidget):
 
         self.current_label_pred = label_pred
         self.sounds[label_pred].play()
+        asyncio.run(send_data(label_pred, slips))
 
 def convert_to_milliseconds(time_str: str) -> int:
     parts = time_str.split(":")
@@ -371,6 +408,8 @@ def predict_realtime(model, processed_data):
     return predicted_class
 
 if __name__ == "__main__":
+    websocket_thread = threading.Thread(target=start_websocket_server, daemon=True)
+    websocket_thread.start()
     app = QApplication(sys.argv)
     win = MainWindow()
     win.show()
