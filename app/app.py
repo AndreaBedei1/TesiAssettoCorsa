@@ -122,7 +122,7 @@ class WheelVisualizer(QWidget):
             (car_rect_x + car_w, center_y + axle_offset - wheel_r),
         ]
 
-        font_size = max(8, int(wheel_r * 0.35))
+        font_size = max(12, int(wheel_r * 0.27))
         for i, (x, y) in enumerate(wheel_positions):
             slip = self.slips[i]
             color = interpolate_color(slip)
