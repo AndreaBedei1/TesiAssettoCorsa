@@ -224,5 +224,4 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# Save model
 torch.save(model.state_dict(), "./models/resnet1d_sequence_model.pth")

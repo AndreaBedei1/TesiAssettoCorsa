@@ -1,6 +1,3 @@
-#### python
-# filepath: c:\Users\Andrea\Desktop\TesiAssettoCorsa\training_data\5_random.py
-# ...existing code...
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -13,24 +10,23 @@ from sklearn.utils.class_weight import compute_class_weight
 from sklearn.utils import shuffle
 from preprocess_dataset import fix_dataset, load_telemetry_data
 from custom_early_stop import CustomEarlyStopping
+from keras.layers import BatchNormalization
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 import joblib
 
 import tensorflow as tf
-from tensorflow.config import threading
 
 import os
-os.environ["OMP_NUM_THREADS"] = "0"  # 0 significa "usa tutti i thread disponibili"
+os.environ["OMP_NUM_THREADS"] = "0"
 os.environ["OPENBLAS_NUM_THREADS"] = "0"
 os.environ["MKL_NUM_THREADS"] = "0"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "0"
 os.environ["NUMEXPR_NUM_THREADS"] = "0"
 
-# === Configurazione iniziale ===
-random_state = 20  # Per riproducibilità
+random_state = 20 
 
-# === Caricamento e preprocessing ===
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
 if df.empty:
     print("Nessun file trovato. Controlla il pattern o la cartella.")
@@ -45,39 +41,32 @@ print("Mappatura delle classi:")
 for i, class_name in enumerate(result_classes):
     print(f"{i}: {class_name}")
 
-# Supponendo tu abbia una colonna 'track_name' con il nome reale del circuito:
 df_mugello = df[df["track"] == "mugello"]
 df_rest = df[df["track"] != "mugello"]
 
-# Selezione feature numeriche + scaling
 feature_cols = [col for col in df_rest.columns if col not in ["track", "driver", "temp", "result"]]
 scaler = StandardScaler()
 
-# Fit dello scaler solo sul sottoinsieme di train/val
 df_rest[feature_cols] = scaler.fit_transform(df_rest[feature_cols])
 joblib.dump(scaler, "./models/0_simple_scaler_random.pkl")
 
-# Prepariamo X e y per df_rest (train/val)
 X_rest = df_rest[feature_cols]
 y_rest = to_categorical(df_rest["result"], num_classes=4)
 
 # Prepariamo X e y per df_mugello (test)
-# Applichiamo lo stesso scaler su Mugello
 df_mugello[feature_cols] = scaler.transform(df_mugello[feature_cols])
 X_mugello = df_mugello[feature_cols]
 y_mugello = to_categorical(df_mugello["result"], num_classes=4)
 
-# Split train/val
 X_train, X_val, y_train, y_val = train_test_split(
     X_rest, y_rest, test_size=0.3, random_state=random_state, stratify=df_rest["result"]
 )
 
-# Data Augmentation solo sul training
 class_counts = np.sum(y_train, axis=0)
 max_count = np.max(class_counts)
 
 augmented_X, augmented_y = [], []
-augmentation_limit = 10000  # Limite di esempi per evitare problemi di memoria
+augmentation_limit = 10000
 
 for i, count in enumerate(class_counts):
     if count < max_count:
@@ -101,7 +90,6 @@ if augmented_X:
     X_train = pd.concat([X_train, augmented_X], axis=0)
     y_train = np.vstack([y_train, augmented_y])
 
-# Shuffle finale
 X_train, y_train = shuffle(X_train, y_train, random_state=random_state)
 
 print("Distribuzione delle classi (train) dopo la data augmentation:")
@@ -109,12 +97,23 @@ class_distribution = np.bincount(np.argmax(y_train, axis=1))
 for i, ccount in enumerate(class_distribution):
     print(f"Classe {i} ({result_classes[i]}): {ccount} esempi")
 
-# Definizione modello
 model = Sequential([
-    Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
-    Dropout(0.2),
+    Dense(256, activation='relu', input_shape=(X_train.shape[1],)),
+    BatchNormalization(),
+    Dropout(0.3),
+    
+    Dense(128, activation='relu'),
+    BatchNormalization(),
+    Dropout(0.3),
+    
     Dense(64, activation='relu'),
+    BatchNormalization(),
+    Dropout(0.2),
+    
     Dense(32, activation='relu'),
+    BatchNormalization(),
+    Dropout(0.2),
+    
     Dense(4, activation='softmax')
 ])
 
@@ -191,4 +190,3 @@ plt.grid()
 
 plt.tight_layout()
 plt.show()
-# ...existing code...

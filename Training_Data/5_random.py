@@ -17,25 +17,22 @@ import matplotlib.pyplot as plt
 import joblib
 
 import tensorflow as tf
-from tensorflow.config import threading
 
-# Configura TensorFlow per utilizzare tutti i processori disponibili
 num_threads = tf.config.threading.get_intra_op_parallelism_threads()
 print(f"Numero di thread disponibili: {num_threads}")
 
-tf.config.threading.set_intra_op_parallelism_threads(0)  # 0 significa "usa tutti i thread disponibili"
+tf.config.threading.set_intra_op_parallelism_threads(0)  
 tf.config.threading.set_inter_op_parallelism_threads(0)
 
 import os
-os.environ["OMP_NUM_THREADS"] = "0"  # 0 significa "usa tutti i thread disponibili"
+os.environ["OMP_NUM_THREADS"] = "0"
 os.environ["OPENBLAS_NUM_THREADS"] = "0"
 os.environ["MKL_NUM_THREADS"] = "0"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "0"
 os.environ["NUMEXPR_NUM_THREADS"] = "0"
 
-# === Configurazione iniziale ===
-split_by_circuit = True  # Non usiamo split per circuito
-random_state = 42  # Per riproducibilità
+split_by_circuit = True
+random_state = 42
 
 # === Caricamento e preprocessing ===
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
@@ -71,33 +68,27 @@ X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_
 X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=random_state, stratify=np.argmax(y_temp, axis=1))
 
 # === Data Augmentation ===
-# === Data Augmentation ===
-# Identifica le classi sottorappresentate
 class_counts = np.sum(y_train, axis=0)
 max_count = np.max(class_counts)
 
 augmented_X, augmented_y = [], []
-augmentation_limit = 10000  # Limite massimo di esempi aggiunti per evitare problemi di memoria
+augmentation_limit = 10000
 
 for i, count in enumerate(class_counts):
     if count < max_count:
-        # Filtra i dati della classe sottorappresentata
         class_indices = np.where(np.argmax(y_train, axis=1) == i)[0]
         class_X = X_train.iloc[class_indices]
         class_y = y_train[class_indices]
 
-        # Calcola il numero di duplicazioni necessarie
         num_to_add = max_count - count
         num_added = 0
 
-        # Duplica i dati fino a raggiungere il numero massimo o il limite
         while num_added < num_to_add and len(augmented_X) < augmentation_limit:
             augmented_X.append(class_X)
             augmented_y.append(class_y)
             num_added += len(class_X)
             class_X = class_X.sample(frac=1, replace=True, random_state=random_state)  # Shuffle
 
-# Combina i dati originali con quelli aumentati
 if augmented_X:
     augmented_X = pd.concat(augmented_X, axis=0)
     augmented_y = np.vstack(augmented_y)
@@ -132,7 +123,7 @@ model = Sequential([
     BatchNormalization(),
     Dropout(0.2),
     
-    Dense(4, activation='softmax')  # Numero di classi
+    Dense(4, activation='softmax')
 ])
 
 
@@ -172,7 +163,7 @@ y_true_classes = np.argmax(y_test, axis=1)
 
 report = classification_report(y_true_classes, y_pred_classes, target_names=result_classes, output_dict=True, zero_division=0)
 for label, metrics in report.items():
-    if isinstance(metrics, dict):  # Skip overall metrics like 'accuracy'
+    if isinstance(metrics, dict):
         print(f"precision for label '{label}': {metrics['precision']:.2f}")
 
 conf_matrix = confusion_matrix(y_true_classes, y_pred_classes, normalize='true')
