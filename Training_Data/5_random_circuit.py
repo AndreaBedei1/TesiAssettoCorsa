@@ -138,7 +138,7 @@ history = model.fit(
     X_train, y_train,
     validation_data=(X_val, y_val),
     epochs=50,
-    batch_size=64,
+    batch_size=1024,
     callbacks=[custom_early_stopping],
     class_weight=class_weights_dict,
     verbose=0

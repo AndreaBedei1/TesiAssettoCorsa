@@ -12,7 +12,7 @@ from tensorflow.keras import layers, Input, Model
 
 # === Config ===
 split_by_circuit = True
-window_size = 5
+window_size = 3
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
 if df.empty:
     print("Nessun file trovato. Controlla il pattern o la cartella.")
@@ -108,7 +108,7 @@ history = model.fit(
     X_train, y_train,
     validation_data=(X_val, y_val),
     epochs=50,
-    batch_size=64,
+    batch_size=1024,
     class_weight=class_weights_dict,
     callbacks=callbacks,
     verbose=1

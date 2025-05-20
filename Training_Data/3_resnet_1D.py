@@ -17,8 +17,8 @@ from custom_early_stop import CustomEarlyStoppingTorch
 from r1 import ResNet1DTabular
 
 # === Config ===
-split_by_circuit = False
-batch_size = 64
+split_by_circuit = True
+batch_size = 1024
 num_epochs = 100
 patience = 7
 
