@@ -75,3 +75,7 @@ Dipende dal contesto e dall'obiettivo del modello, ma in generale:
 In sintesi, la metrica più importante dipende dal tuo obiettivo specifico. Se alcune classi sono più critiche (ad esempio, `grip_loss`), potresti voler massimizzare precision e recall per quelle classi.
 
 
+
+
+
+

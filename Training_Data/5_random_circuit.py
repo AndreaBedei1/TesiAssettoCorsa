@@ -33,6 +33,7 @@ if df.empty:
     exit()
 
 df = fix_dataset(df)
+df["time_idx"] = df.groupby(["track", "driver", "temp"]).cumcount()
 
 result_encoder = LabelEncoder()
 df["result"] = result_encoder.fit_transform(df["result"])

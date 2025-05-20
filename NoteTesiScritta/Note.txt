@@ -16,12 +16,10 @@ Crrazione dataset:
 5 Minuti Soleggiato 0 gradi  mugello
 
 
-Continua a prendere il dataset
 
-Altra cosa: per quanto riguarda il consumo gomme, sono stati fatti test da 5 minuti i quali si ha un usura minima, questo perchè una gara di guida autonoma per il momento non prevede un gran numero di giri.
-Sono state fatte anche prove su un periodo molto più lungo in modo tale da osservare l'usura nel tempo degli pneumatici
-
+Provare anche la regressione
+Regressione con media davanti e media dietro delle gomme
 
 
 
-Sviluppi futuri, provare con pneumatici diversi -> molto importante
+In aggiunta provare a sfalsare di 5 le label, in modo tale da predirre il futuro

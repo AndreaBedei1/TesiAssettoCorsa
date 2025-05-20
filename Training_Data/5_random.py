@@ -11,6 +11,7 @@ from sklearn.utils import shuffle
 from preprocess_dataset import fix_dataset, load_telemetry_data
 from custom_early_stop import CustomEarlyStopping
 from keras.layers import BatchNormalization
+from keras.layers import Input
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -41,18 +42,13 @@ if df.empty:
     exit()
 
 df = fix_dataset(df)
+df["time_idx"] = df.groupby(["track", "driver", "temp"]).cumcount()
 
 result_encoder = LabelEncoder()
 df["result"] = result_encoder.fit_transform(df["result"])
 result_classes = result_encoder.classes_
-print("Mappatura delle classi:")
-for i, class_name in enumerate(result_classes):
-    print(f"{i}: {class_name}")
 
-# Encoding altre colonne categoriali
-df["track"] = LabelEncoder().fit_transform(df["track"])
-df["driver"] = LabelEncoder().fit_transform(df["driver"])
-df["temp"] = LabelEncoder().fit_transform(df["temp"])
+
 
 # Selezione feature numeriche + scaling
 feature_cols = [col for col in df.columns if col not in ["track", "driver", "temp", "result"]]
@@ -96,18 +92,13 @@ if augmented_X:
     X_train = pd.concat([X_train, augmented_X], axis=0)
     y_train = np.vstack([y_train, augmented_y])
 
-# Conta il numero di etichette per classe dopo la data augmentation
-class_distribution = np.bincount(np.argmax(y_train, axis=1))
-print("Distribuzione delle classi dopo la data augmentation:")
-for i, count in enumerate(class_distribution):
-    print(f"Classe {i} ({result_classes[i]}): {count} esempi")
-
 # Shuffle finale
 X_train, y_train = shuffle(X_train, y_train, random_state=random_state)
 
 # === Modello ===
 model = Sequential([
-    Dense(256, activation='relu', input_shape=(X_train.shape[1],)),
+    Input(shape=(X_train.shape[1],)),  # Definisci la forma dell'input
+    Dense(256, activation='relu'),
     BatchNormalization(),
     Dropout(0.3),
     
@@ -123,7 +114,7 @@ model = Sequential([
     BatchNormalization(),
     Dropout(0.2),
     
-    Dense(4, activation='softmax')
+    Dense(4, activation='softmax')  # Numero di classi
 ])
 
 
