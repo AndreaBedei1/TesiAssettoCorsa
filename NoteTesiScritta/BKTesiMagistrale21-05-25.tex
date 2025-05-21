@@ -56,9 +56,9 @@
   
 \vspace{12mm}
 \begin{center}
-{\Large\textsc{\raggedright{Titolo}}}\
+{\Large\textsc{\raggedright{Predictive Modeling of Tire Grip During Cornering in High-Speed Racing}}}\
 \end{center}
-\vspace{25mm}
+\vspace{20mm}
 \par
 \noindent
   
@@ -66,16 +66,17 @@
     \large{Elaborato in \\
     Smart Vehicular Systems}
   \end{center}
-  \vspace{24mm}
+  \vspace{15mm}
   \par
   \noindent
   
   \begin{minipage}[t]{0.47\textwidth}
-  {\large{\bf Relatore:\\
+  {\large{\bf Relatrice:\\
   Silvia Mirri
   \\}}
-  {\large{\bf Correlatore:\\
-  Roberto Girau
+  {\large{\bf Correlatori:\\
+  Roberto Girau\\
+  Giovanni Pau
   }}
   \end{minipage}
   \hfill
@@ -83,9 +84,9 @@
   {\large{\bf Presentata da:\\
   Andrea Bedei}}
   \end{minipage}
-  \vspace{15mm}
+  \vspace{7mm}
   \begin{center}
-  {\large{\bf Anno Accademico 2024/2025}}
+  {\large{\bf Sessione Luglio 2025\\ Anno Accademico 2024/2025}}
   \end{center}
 \end{titlepage}
 
@@ -1552,23 +1553,550 @@ The information plotted in the graphs \ref{fig:abu_1}, \ref{fig:imola_1} and \re
 
 \newpage
 
-\section{Grip Prediction with Machine Learning}
-Dire che dal dataset sono stati tolti i dati dello slip delle ruote, e l'etichetta che va predetta.
-
+\section{Grip Classification with Machine Learning}
 \subsection{Dataset Fix}
+During the dataset preparation phase, it was necessary to perform data cleaning and selection in order to avoid bias in model learning. In particular, all columns related to the \textit{slip} of the four wheels (\textit{wheel\_slip\_front\_left}, \textit{wheel\_slip\_front\_right}, \textit{wheel\_slip\_rear\_left}, \textit{wheel\_slip\_rear\_right}), as this same information was used to construct the target label (\textit{result}) that the model must predict.\\
+Keeping these columns within the input would have introduced a form of \textit{data leakage}, that is, the use of information directly related to the output to be predicted, leading to results that were unrealistically good at validation but poorly generalizable. Similarly, the \textit{result} column itself was also excluded from the input data, as it represents the target variable to be learned.\\
+
+The resulting dataset is thus composed exclusively of measurable variables in real time that do not include information directly derived from labeling, thus making the prediction of car behavior under real or simulated conditions more realistic.
+
+\subsection{Dataset Division}
+To evaluate the performance of the developed machine learning models, the complete dataset collected from 10 drivers, each with sessions conducted at three different tracks (Abu Dhabi, Imola and Mugello) and under three thermal conditions (0°C, 18°C, 36°C), was divided into subsets for training, validation and testing.
+
+Two different strategies for dividing the dataset were adopted:
+\begin{itemize}
+    \item \textbf{classical sequential division:} all the data were sorted chronologically and divided into three portions: 70 percent for training (\textit{training}), 20 percent for validation (\textit{validation}), and 10 percent for testing (\textit{test}). This approach allows the model to be trained on a wide variety of conditions (tracks, temperatures, drivers) and evaluated on the final temporal portion of the dataset, while maintaining the natural order of the data.
+
+    \item \textbf{Division by Geographical Generalization:} In this second approach, data from two tracks (e.g., Imola and Abu Dhabi) are used for training and validation, while data from the third track (e.g., Mugello) are used exclusively for testing. This method is used to evaluate the model's ability to generalize to a track never seen during training, simulating a real world scenario where the model is to be applied to new tracks.
+
+\end{itemize}
+Both strategies allowed us to analyze different capabilities of the model: the first by assessing the ability to learn from the data as a whole, the second by measuring the geographic generalization of the predictive system.
+
+\subsection{Model Accuracy}
+To evaluate the effectiveness of the developed models in predicting the grip behavior of the car, two basic accuracy metrics were adopted:
+
+\begin{itemize}
+    \item \textbf{Global Accuracy:} measures the proportion of correct predictions out of the total number of observations. It is a simple but effective metric when classes are distributed in a balanced manner. However, in the presence of unbalanced datasets, as in our case, where some labels (e.g., \textit{grip\_loss}) are much less frequent than others, this metric can be misleading.
+
+    \item \textbf{Macro Average Precision per Class):} calculates the precision for each class independently and then averages it arithmetically. This approach ensures that all classes have equal weight in the evaluation, regardless of the number of examples. It is particularly useful in unbalanced classification contexts.
+\end{itemize}
+In our study, both metrics were considered, to provide a comprehensive view of performance: the former highlights the overall efficiency of the model, while the latter evaluates its ability to correctly recognize even the least represented classes.\\
+
+\textbf{Formulas used:}
+
+\begin{itemize}
+    \item \textbf{Accuracy globale:}
+    \[
+        Accuracy = \frac{\text{Number of correct predictions}}{\text{Total number of predictions}}
+    \]
+
+    \item \textbf{Macro Average Precision:}
+    \[
+        Macro\_Precision = \frac{1}{N} \sum_{i=1}^{N} \frac{TP_i}{TP_i + FP_i}
+    \]
+    Where $TP_i$ are the true positives of class $i$, $FP_i$ are the false positives of class $i$ and $N$ is the total number of classes.
+\end{itemize}
+The use of both metrics allowed us to evaluate the models not only in terms of overall correctness, but also in terms of fairness in the classification of the different labels, which is critical in real world scenarios in which even the prediction of rare events (such as loss of grip) can be critically important.
+
+\subsection{Early Stopping}
+To ensure efficient training and prevent overfitting phenomena, the technique of Early Stopping was implemented in all the models described in the following sections. This technique monitors model performance on the validation set during training and stops the process when no significant improvement is observed for a defined consecutive number of epochs (\textit{patience}).\\
+
+In particular, a customized approach was used that evaluates the \textbf{Mean Precision per Class} as the main metric for determining the stopping time. This approach allows the importance of different classes to be balanced, even in the presence of unbalanced datasets.\\
+
+When the model shows no improvement in average accuracy per class for a number of epochs equal to the value of \textit{patience}, training is stopped and the model weights are restored to the best state observed during the process. This ensures that the final model is the one with the best performance on the validation set, avoiding overfitting the training data.\\
+
+Implementation of this technique optimized training time and improved generalization of the models, making them more robust and reliable for application to the test data.
+
+\subsection{Visualization of Classes with T-SNE}
+The T-SNE (\textit{t-Distributed Stochastic Neighbor Embedding \cite{van2008tsne}}) model was used to analyze the distribution of classes in the dataset and verify their separability. T-SNE is a nonlinear dimensional reduction technique that allows high-dimensional data to be represented in a two dimensional space while preserving local relationships between points. This approach is particularly useful for visualizing data structure and identifying any overlap between classes.
+
+
+\subsubsection{Results of Visualization}
+Figure \ref{fig:tsne_visualization} shows the distribution of classes in the two-dimensional space generated by the T-SNE. Each point represents a sample of the dataset, colored according to the class to which it belongs (\textit{grip\_loss}, \textit{low\_grip\_accelerate}, \textit{high\_grip\_accelerate}, \textit{neutral}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\textwidth]{img/T-SNE.png}
+    \caption{Visualization of classes with T-SNE.}
+    \label{fig:tsne_visualization}
+\end{figure}
+
+\subsubsection{Analysis}
+From Figure \ref{fig:tsne_visualization}, the following aspects can be observed:
+\begin{itemize}
+    \item The \textit{neutral} class (orange) forms a well-defined cluster separate from the other classes, indicating that the model could easily distinguish this class.
+    \item The classes \textit{low\_grip\_accelerate} (blue) and \textit{high\_grip\_accelerate} (green) show some overlap, suggesting that the model might have difficulty distinguishing between these two classes.
+    \item The class \textit{grip\_loss} (red) is more scatteredly distributed, with some points close to the other classes, which might indicate greater complexity in its prediction.
+\end{itemize}
 
 \subsection{Simple CNN network}
+An extraordinarily simple classifier model was chosen as the first strategy. That is, a convolutional model \cite{lecun1998gradient}.
+
+\subsubsection{Model architecture}
+The implemented model consists of a sequence of \textit{Dense Layers} with the following characteristics:
+\begin{itemize}
+    \item An initial dense layer with 128 nodes and ReLU activation function.
+    \item One \textit{Dropout} layer with a rate of 20\% to reduce the risk of overfitting.
+    \item Two intermediate dense layers with 64 and 32 nodes respectively, both with ReLU activation function.
+    \item One final layer with 4 nodes and activation function \textit{softmax}, for multi class classification.
+\end{itemize}
+
+\subsubsection{Model training}
+Model training was performed using the optimizer \textit{Adam} and the loss function \textit{categorical crossentropy}. To handle class imbalance, balanced class weights (\textit{class weights}) were calculated and applied. In addition, a customized \textit{early stopping} mechanism was used to stop training when performance on the validation set did not improve for 7 consecutive epochs.
+
+\subsubsection{Evaluation of the Model}
+After training, the model was evaluated on the reserved test set. The following metrics were calculated:
+\begin{itemize}
+    \item \textbf{Accuracy overall:} The proportion of correct predictions out of the total.
+    \item \textbf{Accuracy by class:} The accuracy was calculated for each class and reported in a detailed report.
+\end{itemize}
+
+\subsubsection{Display of Results}
+To analyze the performance of the model, the following graphs were generated:
+\begin{itemize}
+    \item \textbf{Normalized Confusion Matrix:}  
+    The normalized confusion matrix, shown in Figure \ref{fig:confusion_matrix}, highlights the distribution of correct predictions and errors for each class. Each cell represents the proportion of examples of a real class (vertical axis) that were predicted as belonging to a specific class (horizontal axis). This type of visualization is particularly useful for identifying possible confusions between classes, such as the overlap between \textit{grip\_loss} and \textit{low\_grip\_accelerate}.
+    In addition as seen from the validation, the serrations in the curve are due to the different weight for each error in each class.\\
+
+    \item \textbf{Loss and accuracy trend:}  
+    The graphs in Figure \ref{fig:training_validation} show the evolution of  (\textit{loss}) and (\textit{accuracy}) during the training and validation epochs. A gradual reduction in loss and improvement in accuracy can be observed, with stable convergence toward the end of training. This indicates that the model was able to learn from the data without incurring significant overfitting.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{img/0NO.png}
+    \caption{Simple CNN normalized confusion matrix.}
+    \label{fig:confusion_matrix}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{img/0NOLoss.png}
+    \caption{Trend of loss and accuracy during training and validation of simple CNN.}
+    \label{fig:training_validation}
+\end{figure}
+
+\subsubsection{Results obtained}
+The results obtained by the model on the test set are summarized below:
+\begin{itemize}
+    \item \textbf{Class precision:}
+    \begin{itemize}
+        \item \textit{grip\_loss:} 0.69
+        \item \textit{high\_grip\_accelerate:} 0.84
+        \item \textit{low\_grip\_accelerate:} 0.62
+        \item \textit{neutral:} 1.00
+    \end{itemize}
+    \item \textbf{Macro Average Precision:} 0.78
+    \item \textbf{Average Precision:} 0.91
+\end{itemize}
+
+These results show a good ability of the model to distinguish between different classes, with particularly high accuracy for the \textit{neutral} class. However, there is more difficulty in correctly recognizing the class \textit{low\_grip\_accelerate}, which could be improved with further optimization or data balancing techniques.
+
+\subsection{LSTM model}
+The LSTM model (\textit{Long Short-Term Memory}) is designed to exploit the sequential nature of telemetry data, taking into account temporal dependencies between samples. This approach is particularly useful for capturing the evolution of grip behavior over time, considering factors such as tire wear and driving conditions.
+
+\subsubsection{Model Architecture}
+The LSTM model consists of a sequence of layers designed to process temporal data. The structure of the model is shown below:
+
+\begin{lstlisting}[language=Python, caption=Architecture of the LSTM model]
+model = Sequential([
+    Input(shape=(X_train.shape[1], X_train.shape[2])),
+    LSTM(64, return_sequences=False),
+    Dropout(0.3),
+    Dense(64, activation='relu'),
+    Dropout(0.2),
+    Dense(32, activation='relu'),
+    Dense(4, activation='softmax')
+])
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{Input layer:} Accepts time sequences with a length equal to \textit{window\_size = 3} and with a number of features equal to the number of numerical columns selected.
+    \item \textbf{LSTM layer:} The LSTM layer with 64 units is the core of the model. This layer can store long-term and short-term information, making it ideal for capturing temporal dependencies in the data. The option \textit{return\_sequences=False} indicates that the layer returns only the final sequence output, which represents a summary of the temporal information.
+    \item \textbf{Dense layers:} After the LSTM layer, the model includes two dense layers (\textit{Dense}) with 64 and 32 nodes respectively, both with ReLU activation function. These layers further process the information extracted from the LSTM layer.
+    \item \textbf{Output Layer:} The final layer consists of 4 nodes with activation function \textit{softmax}, corresponding to the four grip classes to be predicted.
+    \item \textbf{Dropout:} Layers of \textit{Dropout} were included with rates of 30\% and 20\% to reduce the risk of overfitting.
+\end{itemize}
+
+\subsubsection{Inclusion of Time with time index}
+A key aspect of this model is the inclusion of the \textit{time\_idx} column, which represents the time index within each driving session. This field allows the model to understand that time is running and that, as a result, there will be a progressive reduction in \textit{slip} due to tire wear.\\
+
+The column \textit{time\_idx} was calculated as follows:
+\begin{lstlisting}[language=Python, caption=Calculation of \textit{time\_idx}]
+df["time_idx"] = 
+df.groupby(["track", "driver", "temp"]).cumcount()
+\end{lstlisting}
+This approach assigns an incremental index to each sample within each combination of circuit, driver, and temperature, providing the model with an explicit indication of temporal progression.
+
+\subsubsection{Creation of Temporal Sequences}
+To train the LSTM model, the data were transformed into time sequences of fixed length (\textit{window\_size}). Each sequence consists of \textit{window\_size} consecutive samples, while the label associated with the sequence corresponds to the value in the \textit{result} column of the final window sample. These samples are not mixed for the purpose of more accurate prediction. The window size length equal to 3 was decided on the fact that the time window should be neither too short in order to have only little information, nor too long because if not, the main factor of prediction in high-speed curve is lost. The code for creating the sequences is given below:
+
+\begin{lstlisting}[language=Python, caption=
+Creation of time sequences]
+for name, group in df.groupby(group_cols):
+    if len(group) < window_size:
+        continue
+    group = group.reset_index(drop=True)
+    for i in range(len(group) - window_size):
+        window = group.iloc[i:i + window_size]
+        sequences.append(window[feature_cols].to_numpy())
+        labels.append(group.iloc
+                    [i + window_size - 1]["result"])
+\end{lstlisting}
+
+\subsubsection{Model evaluation}
+The model was trained using the optimizer \textit{Adam} and the loss function \textit{categorical crossentropy}. During training, a \textit{early stopping} mechanism was used to stop the process when the performance on the validation set did not improve for 7 consecutive epochs.\\
+
+The final results of the model were evaluated on the test set, with metrics such as accuracy per class and normalized confusion matrix. The inclusion of \textit{time\_idx} allowed the model to better capture temporal dynamics, improving its ability to correctly predict grip behavior as a function of time.
+
+\subsubsection{Display of Results}.
+To analyze the performance of the LSTM model, the following graphs were generated:
+\begin{itemize}
+    \item \textbf{Normalized confusion matrix}:   
+    It can be seen that the model achieved particularly high accuracy for the \textit{neutral} class, while the other classes show a slight overlap, which could be further improved with data balancing techniques, but difficult to apply in this context.
+
+    \item \textbf{Loss and accuracy trend:} The graphs in Figure \ref{fig:lstm_training_validation} show the evolution of \textit{loss} and \textit{accuracy} during the training and validation epochs. A gradual reduction in loss and improvement in accuracy can be observed, with stable convergence toward the end of training.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{img/1NO.png}
+    \caption{Normalized confusion matrix of the LSTM model.}
+    \label{fig:lstm_confusion_matrix}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{img/1NOLoss.png}
+    \caption{Trend of loss and accuracy during training and validation of the LSTM model.}
+    \label{fig:lstm_training_validation}
+\end{figure}
+
+\subsubsection{Results obtained}.
+The results obtained from the LSTM model on the test set are summarized below:
+\begin{itemize}
+    \item \textbf{Precision per class:}
+    \begin{itemize}
+        \item \textit{grip\_loss:} 0.85
+        \item \textit{high\_grip\_accelerate:} 0.91
+        \item \textit{low\_grip\_accelerate:} 0.82
+        \item \textit{neutral:} 0.98
+    \end{itemize}
+    \item \textbf{Macro Average Precision:} 0.89
+    \item \textbf{Average Precision:} 0.94
+\end{itemize}
+
+These results highlight that the LSTM model is one of the best among those developed because of its ability to capture temporal dependencies in the data. The high accuracy for all classes, particularly for \textit{neutral} and \textit{high\_grip\_accelerate}, demonstrates the effectiveness of the temporal sequence approach. In addition, the inclusion of the \textit{time\_idx} column allowed the model to better understand the temporal evolution of grip, further improving overall performance.
+
 
 \subsection{Transformer}
+The Transformer model is designed to exploit temporal relationships in telemetry data, using an architecture based on multi-headed attention mechanisms (\textit{Multi-Head Attention}). This architecture is particularly suitable for capturing long-term dependencies in sequential data, overcoming some limitations of recurrent models such as LSTM.\\
 
-\subsection{LSTM}
+The implemented model is inspired by the example provided in the official Keras documentation \cite{keras_transformer_example} and has an optimized structure for the time sequence classification problem.
 
-\subsection{Tabular Resnet 1D}
+\subsubsection{Model Architecture}.
+The model consists of the following main components:
+\begin{itemize}
+    \item \textbf{Input layer:} It accepts time sequences of fixed length (\textit{window\_size}) and with a number of features equal to that of the selected numerical columns.
+    \item \textbf{Encoder Transformer:} Two Transformer encoder blocks, each consisting of:
+    \begin{itemize}
+        \item \textit{Multi-Head Attention:} Allows the model to focus on different parts of the sequence in parallel, capturing long-term relationships.
+        \item \textit{Dropout:} Reduces the risk of overfitting.
+        \item \textit{Layer Normalization:} Stabilizes training by normalizing the output.
+        \item \textit{Feed-Forward Network:} A 1D convolutional network with ReLU activation to further process the information.
+    \end{itemize}
+    \item \textbf{Global Average Pooling:} Reduces dimensionality by aggregating information along the temporal dimension.
+    \item \textbf{Dense Layers:} Two dense layers with 128 and 4 nodes respectively, used for final classification.
+    \item \textbf{Batch Normalization and Dropout:} They improve training stability and reduce the risk of overfitting.
+\end{itemize}
+
+The network code is given below:
+\begin{lstlisting}[language=Python, caption=Architecture of the Transformer model]
+def transformer_encoder(inputs, head_size, num_heads, 
+        ff_dim, dropout=0):
+    x = layers.MultiHeadAttention(key_dim=head_size, 
+        num_heads=num_heads, dropout=dropout)(inputs, inputs)
+    x = layers.Dropout(dropout)(x)
+    x = layers.LayerNormalization(epsilon=1e-6)(x + inputs)
+
+    ff = layers.Conv1D(filters=ff_dim, kernel_size=1, 
+        activation="relu")(x)
+    ff = layers.Dropout(dropout)(ff)
+    ff = layers.Conv1D(filters=inputs.shape[-1],
+        kernel_size=1)(ff)
+    return layers.LayerNormalization(epsilon=1e-6)(x + ff)
+
+def build_model(input_shape, n_classes):
+    inputs = Input(shape=input_shape)
+    x = transformer_encoder(inputs, head_size=64, 
+            num_heads=4, ff_dim=64, dropout=0.2)
+    x = transformer_encoder(x, head_size=64, 
+            num_heads=4, ff_dim=64, dropout=0.2)
+    x = layers.GlobalAveragePooling1D()(x)
+    x = layers.Dense(128, activation="relu")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.3)(x)
+    outputs = layers.Dense(n_classes, activation="softmax")(x)
+    return Model(inputs, outputs)
+\end{lstlisting}
+
+\subsubsection{Model Parameters}
+The model has a total of 61.476 parameters, of which:
+\begin{itemize}
+    \item \textbf{Parameters Trainable:} 61,220 (239.14 KB).
+    \item \textbf{Non-Trainable parameters:} 256 (1.00 KB).
+\end{itemize}
+This configuration balances model complexity with computational efficiency, making it suitable for the temporal sequence classification problem.
+
+\subsubsection{Transformer Operation}
+The Transformer uses the attention mechanism to assign different weight to each element in the sequence, based on its relevance to the classification task. This approach allows the model to capture complex relationships among the data, even when temporal dependencies span long sequences.\\
+
+The use of \textit{Global Average Pooling} reduces the dimensionality of sequences by aggregating the most relevant information along the temporal dimension. The final dense layers process this information to produce the final classification.
+
+\subsubsection{Use of Time Index and Early Stopping}
+The time index \textit{time\_idx} was also used in the Transformer model to indicate the temporal progression within driving sessions. This approach allowed the model to capture the temporal evolution of grip, taking into account factors such as tire wear and driving conditions. In addition, the \textit{Custom Early Stopping} mechanism, described above, was implemented.
+
+\subsubsection{Display of Results}
+To analyze the performance of the Transformer model, the following graphs were generated:
+
+\begin{itemize}
+    \item \textbf{Normalized Confusion Matrix:}  
+    The normalized confusion matrix, shown in Figure \ref{fig:transformer_confusion_matrix}, shows that the model performed well for the class \textit{neutral}, with very high accuracy. However, there is significant overlap for the class \textit{grip\_loss}, which is more difficult to distinguish than the others. This suggests that the Transformer model, while effective, does not achieve the performance of the LSTM model for some classes.
+
+    \item \textbf{Loss and accuracy trend:}  
+    The graphs in Figure \ref{fig:transformer_training_validation} show the evolution of loss (\textit{loss}) and accuracy (\textit{accuracy}) during the training and validation epochs. A gradual reduction in loss and improvement in accuracy is observed, with stable convergence toward the end of training. However, fluctuations in the validation curve indicate that the model is affected by weight class balancing.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{img/2Sì.png}
+    \caption{Normalized confusion matrix of the Transformer model.}
+    \label{fig:transformer_confusion_matrix}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{img/2SìLoss.png}
+    \caption{Trend of loss and accuracy during training and validation of the Transformer model.}
+    \label{fig:transformer_training_validation}
+\end{figure}
+
+\subsubsection{Achievements}
+The results obtained from the Transformer model on the test set are summarized below:
+\begin{itemize}
+    \item \textbf{Precision per class:}
+    \begin{itemize}
+        \item \textit{grip\_loss:} 0.58
+        \item \textit{high\_grip\_accelerate:} 0.87
+        \item \textit{low\_grip\_accelerate:} 0.72
+        \item \textit{neutral:} 0.98
+    \end{itemize}
+    \item \textbf{Macro Average Precision:} 0.79
+    \item \textbf{Average Precision:} 0.91
+\end{itemize}
+
+These results show that the Transformer model is able to achieve good overall performance, with high accuracy for the \textit{neutral} class and acceptable results for the other classes. However, its performance is not comparable to that of the LSTM model, particularly for the \textit{grip\_loss} class, which has lower accuracy. However, the inclusion of the \textit{time\_idx} column allowed the model to capture temporal dependencies, improving prediction ability compared to a static approach.
+
+\subsection{ResNet 1D Model for Tabular Data}
+The ResNet 1D model is designed to exploit the capabilities of ResNet networks (\textit{Residual Networks}) applied to tabular data. This approach differs from other models used in that it introduces residual blocks, which allow for improved gradient propagation during training and for dealing with vanishing gradient problems, which are particularly relevant in deep networks.
+
+\subsubsection{Network Architecture}
+The implemented ResNet 1D network consists of a sequence of residual blocks designed to process tabular data. Each residual block consists of:
+\begin{itemize}
+    \item \textbf{Linear layers:} Two linear layers with constant size (128 nodes) within each residual block.
+    \item \textbf{Batch Normalization:} Stabilizes training by normalizing the output of each linear layer.
+    \item \textbf{ReLU Activation:} Introduces nonlinearities to improve the learning capability of the network.
+    \item \textbf{Remaining connections:} Allows the original block input to be summed to the processed output, facilitating gradient propagation and improving the learning ability of the network.
+\end{itemize}
+
+The architecture of the model is as follows:
+\begin{itemize}
+    \item \textbf{Input layer:} A linear layer that projects input data into a 128-dimensional space, followed by a ReLU activation function and batch normalization.
+    \item \textbf{Residual Blocks:} A sequence of residual blocks (the number is determined by the parameter \textit{depth}, set to 3 in the provided model).
+    \item \textbf{Output Layer:} A linear layer that reduces the size from 128 to 64, followed by a ReLU activation function and an additional linear layer that maps the 64 nodes to the output nodes corresponding to the number of classes.
+\end{itemize}
+
+\subsubsection{Advantages of the ResNet 1D Model}
+The use of a ResNet 1D network for tabular data offers several advantages over traditional approaches:
+\begin{itemize}
+    \item \textbf{Gradient Propagation:} Residual connections facilitate gradient propagation during training, reducing the risk of vanishing gradient.
+    \item \textbf{Generalization Capability:} Residual blocks allow the network to learn deeper and more complex representations, improving generalization ability.
+    \item \textbf{Adaptability to Tabular Data:} The use of linear layers and residual connections enables the capture of complex patterns in tabular data, making the model particularly suitable for classification problems.
+\end{itemize}
+
+\subsubsection{Model Implementation}.
+The model was implemented in PyTorch and has the following structure:
+\begin{lstlisting}[language=Python, caption=Architecture of the ResNet 1D model]
+class ResidualBlock(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.BatchNorm1d(dim),
+            nn.ReLU(),
+            nn.Linear(dim, dim),
+            nn.BatchNorm1d(dim)
+        )
+
+    def forward(self, x):
+        return F.relu(x + self.block(x))
+
+class ResNet1DTabular(nn.Module):
+    def __init__(self, input_dim, num_classes, depth=3):
+        super().__init__()
+        self.input_layer = nn.Sequential(
+            nn.Linear(input_dim, 128),
+            nn.ReLU(),
+            nn.BatchNorm1d(128)
+        )
+        self.res_blocks = nn.Sequential(*[ResidualBlock(128) 
+            for _ in range(depth)])
+        self.output_layer = nn.Sequential(
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.input_layer(x)
+        x = self.res_blocks(x)
+        return self.output_layer(x)
+\end{lstlisting}
+
+\subsubsection{Use of Temporal Index and Early Stopping}
+The temporal index \textit{time\_idx} was also used in this model to indicate the temporal progression within driving sessions. This approach allowed the model to capture the temporal evolution of grip, taking into account factors such as tire wear and driving conditions.
+In addition, the \textit{Custom Early Stopping} mechanism described above was implemented.
+
+\subsubsection{Display of Results}
+To analyze the performance of the ResNet 1D model, the following graphs were generated:
+
+\begin{itemize}
+    \item \textbf{Normalized Confusion Matrix:}  
+    The normalized confusion matrix, shown in Figure \ref{fig:resnet_confusion_matrix}, shows that the model performed well overall.
+
+    \item \textbf{Loss and accuracy trend:}  
+    The graphs in Figure \ref{fig:resnet_training_validation} show the evolution of loss (\textit{loss}) and accuracy (\textit{accuracy}) during the training and validation epochs.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{img/3Sì.png}
+    \caption{Normalized confusion matrix of the ResNet 1D model.}
+    \label{fig:resnet_confusion_matrix}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{img/3SìLoss.png}
+    \caption{
+Trend of loss and accuracy during training and validation of the ResNet 1D model.}
+    \label{fig:resnet_training_validation}
+\end{figure}
+
+\subsubsection{Results obtained}.
+The results obtained from the ResNet 1D model on the test set are summarized below:
+\begin{itemize}
+    \item \textbf{Precision per class:}
+    \begin{itemize}
+        \item \textit{grip\_loss:} 0.85
+        \item \textit{high\_grip\_accelerate:} 0.90
+        \item \textit{low\_grip\_accelerate:} 0.81
+        \item \textit{neutral:} 0.99
+    \end{itemize}
+    \item \textbf{Macro Average Precision:} 0.89
+    \item \textbf{Average Precision:} 0.94
+\end{itemize}
 
 
+The ResNet 1D model achieved an overall accuracy of 94\% on the test set, with particularly high precision for the \textit{neutral} class. However, the \textit{grip\_loss} class has a lower recall (0.63), highlighting a difficulty in correctly distinguishing this class from the others. This result is influenced by the imbalance of the dataset, where the class \textit{grip\_loss} is significantly less represented than the others.
 
+\subsubsection{Analysis}
+The ResNet 1D model, along with the LSTM model, is one of the best of those tested because of its ability to capture complex patterns in temporal data. The use of residual blocks allowed the model to learn deep representations and to generalize well on test data. Despite the difficulties associated with class imbalance, the model demonstrated high overall accuracy, making it a viable choice for telemetry classification applications.
 
+\subsubsection{Sequential Version of ResNet 1D}
+In addition to the tabular version of the ResNet 1D, a variant considering a sequence of 3 elements as input was implemented in order to test whether the results could improve and become comparable to those obtained with the LSTM model. However, the results were worse than the tabular version and the LSTM.
 
+\paragraph{Differences in Structure}
+The main difference from the tabular version is the use of 1D convolutions to process time sequences. Specifically:
+\begin{itemize}
+    \item \textbf{1D convolutions:} The network uses 1D convolutional layers to capture local patterns in temporal sequences. Each residual block consists of two 1D convolutions with kernel size 3, followed by batch normalization and residual connections.
+    \item \textbf{Pooling:} The network includes a layer of \textit{MaxPooling} to reduce dimensionality along the temporal dimension.
+    \item \textbf{Output Layer:} After the residual blocks, the network uses a \textit{Adaptive Average Pooling} to aggregate the information along the temporal dimension, followed by a linear layer for final classification.
+\end{itemize}
+
+\paragraph{Reasons for Worst Results}
+The worst results compared with LSTM and the tabular version of ResNet 1D can be attributed to several factors:
+\begin{itemize}
+    \item \textbf{Inadequacy of Structure}. Sequential ResNet 1D may not be optimal for capturing long-term temporal dependencies, which are instead well handled by LSTM models due to their ability to store long-term information.
+    \item \textbf{Limited Overlap:} 1D convolutions, while effective for local patterns, may not be able to capture more complex relationships between sequence elements.
+\end{itemize}
+
+Despite the introduction of 1D convolutions and residual blocks, the sequential version of ResNet 1D did not achieve the desired performance. This result highlights that, for sequential classification problems with complex temporal dependencies, models such as the LSTM remain a more suitable choice than a ResNet designed for tabular data or short sequences.
+
+\subsection{CNN Network With Data Augmentation}
+In addition to the tests described so far, an additional possibility was tested: the idea of losing the concept of temporal sequence and not keeping the data in sequential order. In this approach, the data were divided into training and validation sets using two circuits, while a third circuit was used as a test set. This method allowed the model to be evaluated in a context where the test data came from a completely different circuit than those used for training.
+
+\subsubsection{Model Architecture}
+The model used is a fully connected neural network (CNN) with a simple structure designed to be suitable for real time predictions. The architecture consists of:
+\begin{itemize}
+    \item \textbf{Dense Layers:} Four fully connected layers with decreasing size (256, 128, 64, 32 nodes), each followed by a ReLU activation function.
+    \item \textbf{Batch Normalization:} Applied after each dense layer to stabilize training.
+    \item \textbf{Dropout:} Used to reduce the risk of overfitting, with dropout rates varying between 20\% and 30\%.
+    \item \textbf{Output Layer:} A final layer with 4 nodes and softmax activation function for grip class classification.
+\end{itemize}
+
+\subsubsection{Data Augmentation}
+To address class imbalance, a data augmentation technique was applied. The least represented classes were replicated until a similar number of examples were reached as the most represented class. This process improved the distribution of classes in the training set, making the model more robust.
+
+\subsubsection{Results and Considerations}
+The model performed very well on the test track (\textit{Mugello}), with an overall accuracy of 95\%. The main results are summarized below:
+\begin{itemize}
+    \item \textbf{Precision per class:}
+    \begin{itemize}
+        \item \textit{grip\_loss:} 0.84
+        \item \textit{high\_grip\_accelerate:} 0.94
+        \item \textit{low\_grip\_accelerate:} 0.75
+        \item \textit{neutral:} 0.99
+    \end{itemize}
+    \item \textbf{Macro Average Precision:} 0.88
+    \item \textbf{Average Precision:} 0.95
+\end{itemize}
+
+The graphs in Figure \ref{fig:cnn_training_validation} show the trends of loss (\textit{loss}) and accuracy (\textit{accuracy}) during the training and validation epochs. It is observed that the accuracy on the validation set is higher than on the training set, a behavior attributable to the use of \textit{Dropout}, which reduces overfitting during training. The loss curve stabilizes toward the end of training, indicating good model convergence.
+The normalized confusion matrix, shown in Figure \ref{fig:cnn_confusion_matrix}, indicates that the model performed exceptionally well for the class \textit{neutral} (accuracy 0.99) and \textit{high\_grip\_accelerate} (accuracy 0.94). However, the class \textit{low\_grip\_accelerate} exhibits a lower accuracy (0.75), suggesting that the model may face challenges in distinguishing this class in certain cases. Nevertheless, the performance for this class is higher compared to other models, particularly for the most challenging case of \textit{grip\_loss}, where this model achieves the best recall and precision among all the models tested.\\
+
+Despite the good performance, it is important to point out some limitations:
+\begin{itemize}
+    \item \textbf{Dataset labeling:} Accuracy could be affected by the fact that dataset labeling is not perfectly accurate. Improvement in the labeling process could lead to more reliable results.
+    \item \textbf{Simulated Data:} The data used come from a simulator, which could limit the generalizability of the model to real data collected on a physical circuit.
+    \item \textbf{Loss of Sequence Concept:} The elimination of the temporal sequence concept may have simplified the problem, but it also reduced the model's ability to capture complex temporal dependencies that might be relevant to the non-simulation-mode task.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{img/0RandomLossSI.png}
+    \caption{Trend of loss and accuracy during training and validation of the CNN model.}
+    \label{fig:cnn_training_validation}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{img/0RandomNO.png}
+    \caption{Normalized confusion matrix of the CNN model on the test circuit (\textit{Mugello}).}
+    \label{fig:cnn_confusion_matrix}
+\end{figure}
+
+\subsubsection{Conclusion}
+This approach has shown that very good performance can be achieved even with a simple model and without considering the temporal sequence. However, for real applications, it would be necessary to use data collected in a physical context and improve the labeling process. In addition, the use of models that consider temporal sequence, such as LSTM, could provide more robust results in more complex scenarios.
+
+\subsection{Batch size choice}.
+In the context of this work, a high \textbf{batch size} (equal to 1024) was adopted over commonly used values (e.g., 32 or 64). This choice is motivated by the \textbf{balanced nature of the dataset}, in which the neutral class is largely predominant.
+
+Using a larger batch size reduces the probability that a single batch will contain only samples belonging to the majority class, thus improving the representativeness of minority classes during training. In addition, this strategy was particularly useful in combination with \textbf{weighting of class weights}, which was applied to further compensate for the imbalance. In summary, the choice of a batch size of 1024 helped to make the learning process more effective by ensuring better generalization of the model over the less frequent classes.
+
+\section{Future Grip Classification with Machine Learning}
+
+\section{Front and Back Slip Regression with Machine Learning}
 
 
 \newpage
@@ -1694,10 +2222,10 @@ Interaction with the interface is not limited to the visual aspect, but is desig
     \end{itemize}
 \end{itemize}
 
-\section{Technology}
+\subsection{Technology}
 The application was developed using the Python programming language and the PyQt5 library, one of the most powerful libraries for creating cross-platform graphical user interfaces. PyQt5 offers a wide range of tools for designing modern, interactive GUIs, allowing the integration of advanced features such as event handling, graphical rendering, and multimedia support.
 
-\subsection{Application Technology Structure}
+\subsubsection{Application Technology Structure}
 The application consists of several main components:
 \begin{itemize}
     \item \textbf{WheelVisualizer:} a custom widget that uses the \texttt{QPainter} module to draw a graphical representation of the vehicle wheels. Each wheel is dynamically colored according to the slip value, which is calculated and updated in real time.
@@ -1709,7 +2237,7 @@ The application consists of several main components:
     \end{itemize}
 \end{itemize}
 
-\subsection{Technologies Used}
+\subsubsection{Technologies Used}
 \begin{itemize}
     \item \textbf{PyQt5:} used for creating the graphical user interface, including custom widgets, event management, and graphical rendering.
     \item \textbf{QPainter:} employed for wheel and vehicle body design, with a responsive design that adapts to the window size.
@@ -1717,8 +2245,41 @@ The application consists of several main components:
     \item \textbf{QTimer:} used to periodically update wheel slip and vehicle status data.
 \end{itemize}
 
+\subsubsection{Data Exposure via WebSocket}
+Data processed by the application are made available in real time through a WebSocket connection.
+This allows for:
+\begin{itemize}
+    \item Receive slip, and classification information asynchronously;
+    \item Integrate the results into a Web interface or any client compatible with the WebSocket protocol;
+    \item Dynamically update graphs and visualizations without reloading the page or interrupting program execution.
+\end{itemize} 
+
+\subsection{Testing}
+\subsubsection{User interface evaluation with the UEQ questionnaire}
+
+To assess the quality of the graphical user interface of the application \textit{Slip Dashboard}, the User Experience Questionnaire (UEQ) was administered to a sample of 10 users. The questionnaire consists of 26 pairs of opposing adjectives, grouped into six main categories reflecting different dimensions of user experience:
+\begin{itemize}
+    \item \textbf{Attractiveness}: Overall rating of interface enjoyment.
+    \item \textbf{Clearness/Learnability}: How easy the interface is to understand and learn.
+    \item \textbf{Efficiency}: How quickly the interface allows operations to be performed.
+    \item \textbf{Controllability}: Feeling of control by the user.
+    \item \textbf{Stimulation}: How interesting and engaging the interface is.
+    \item \textbf{Originality}: Perception of innovation and creativity.
+\end{itemize}
+
+Each item is rated on a 7-point scale where the extremes represent the two opposite characteristics (e.g., “annoying” vs. “pleasant,” "neat" vs. “overloaded”).\\
+The interface under consideration (Fig.\ref{fig:GUI}) was tested in simulated mode, and the data were processed according to the methodological directions of the UEQ manual. The results were analyzed in terms of:
+\begin{itemize}
+    \item Overall and single dimension mean and standard deviation.
+    \item Statistical accuracy by 95 percent confidence interval for each scale.
+    \item Display of distribution of responses by item and by group.
+    \item Internal consistency of groups (checked by Cronbach's $\alpha$ coefficient).
+\end{itemize}
+Overall, the simulated results showed a positive evaluation, particularly for the scales \textit{Efficiency} and \textit{Learnability}, while dimensions such as \textit{Originality} and \textit{Stimulation} scored slightly lower but still in the positive area.\\
+This evaluation represents a first step toward optimizing the interface, providing concrete indications of what graphical or functional aspects can be further improved in future versions.
+
 \newpage
-\section{Final Result}
+\subsection{Final Result}
 The end result is an intuitive and functional Graphical User Interface designed to monitor in real time and provide immediate feedback to the driver. The interface is shown in the figure \ref{fig:GUI}.
 \begin{figure}[H]
 \centering
@@ -1727,49 +2288,43 @@ The end result is an intuitive and functional Graphical User Interface designed 
 \label{fig:GUI}
 \end{figure}
 
-\chapter{Future developments}
-Parlare del fatto di poter usare tipologie di mescola differente per le ruote.
+\chapter{Future Developments}
+The present work represents only the first step in a vast and evolving field of research. The potential for extension of the described system is manifold and lends itself to different areas of application, both in the context of automotive competition and in everyday mobility.
 
-Possibilità di utilizzare un altro simulatore al fine di avere anche condizioni climatiche come neve, pioggia, ghiaccio al fine di rendere il caso più reale possibile.
+\section{Integration with Reinforcement Learning algorithms}
+One of the most natural and promising developments in this study is the integration of the predictive model within the reward function of an agent based on Reinforcement Learning. Specifically, the information provided by the classifier (i.e., whether the vehicle can accelerate further into a curve, whether it has reached the limit, or whether it has lost grip) could be used as a direct penalty or incentive in the agent's learning of optimal behavior.\\
+
+In simulative contexts such as Assetto Corsa, where autonomous driving projects based on reinforcement learning are already in place, the introduction of a reward function informed by the state of grip could significantly improve the learned driving strategy, making it more realistic and conservative at critical points on the track (curves, chicanes, changes in slope).
+
+\section{Training on real data}
+Another important future development is to train the model on data from real vehicles. Currently, the neural networks have been trained using simulated data obtained from the Assetto Corsa software; although this data is physically consistent and sufficiently complex, the introduction of datasets acquired from real cars on the track would allow an increase in the level of generalization and robustness of the model against real noise, sensor imperfections, and external variability.\\
+This transition from simulated data to real data is critical to make the system usable in practical applications such as advanced driver assistance or validation of control strategies for racing vehicles.
+
+\section{Application to the civil automotive sector}
+
+A particularly interesting development, which opens up scenarios for applied research in the world of mobility, concerns the extension of the model to the context of road cars. With appropriate modifications and simplifications, the system could be integrated as an auxiliary module in active safety systems such as the Electronic Stability Program (ESP), providing predictive grip analysis available in real time.\\
+In particular, the system could offer an additional layer of interpretation of data already acquired from on-board sensors (such as ABS, skid sensors, IMU, etc.), anticipating situations of loss of vehicle control and enabling proactive interventions.
+
+\section{Extension to varying environmental and mechanical conditions}
+
+To increase the generalization of the model, further future development is to introduce more diverse environmental and mechanical variables during training. Environmental temperature variability has already been considered in this work, but the model could be extended further to include:
+
+\begin{itemize}
+    \item Different weather conditions: rain, wet runway, fog or frost;
+    \item Different types of tires: soft, medium, hard, intermediate or rain compounds;
+    \item Different mechanical setups of the car: initial tire pressure, setup settings, aerodynamics;
+    \item Types of tracks: city, street or kart tracks.
+\end{itemize}
+
+These extensions would significantly increase the model's ability to adapt to unforeseen or unseen scenarios during training, making it more suitable for integration into real-world driving contexts or advanced driver training simulators.
+
+\section{Intelligent User Interfaces and Multichannel Feedback}
+Finally, another line of development concerns the improvement of user interfaces and data visualization systems. The currently proposed interface could be enriched with vibration capabilities or voice prompts, enabling more effective multimodal interaction, especially in simulated or real-world driving contexts where visual distraction needs to be minimized.
+
 
 \chapter{Conclusion}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-%\begin{figure}[hbtp]
-%\centering
-%\includegraphics[scale=0.6]{img/casi.png}
-%\caption{Schema dei casi d'uso per la piattaforma.}
-%\label{figura:casiDuso}
-%\end{figure}
 
 
 \bibliographystyle{IEEEtran}

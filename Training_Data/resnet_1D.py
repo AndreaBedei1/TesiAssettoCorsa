@@ -16,13 +16,11 @@ from preprocess_dataset import fix_dataset, load_telemetry_data
 from custom_early_stop import CustomEarlyStoppingTorch
 from r1 import ResNet1DTabular
 
-# === Config ===
 split_by_circuit = True
 batch_size = 1024
 num_epochs = 100
 patience = 7
 
-# === Load and preprocess ===
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
 if df.empty:
     print("Nessun file trovato. Controlla il pattern o la cartella.")
@@ -34,11 +32,9 @@ result_encoder = LabelEncoder()
 df["result"] = result_encoder.fit_transform(df["result"])
 result_classes = result_encoder.classes_
 
-# Save class names for future use
 os.makedirs("./models", exist_ok=True)
 np.save("./models/1_resnet_classes.npy", result_classes)
 
-# Encode additional categorical features
 df["track"] = LabelEncoder().fit_transform(df["track"])
 df["driver"] = LabelEncoder().fit_transform(df["driver"])
 df["temp"] = LabelEncoder().fit_transform(df["temp"])
@@ -50,7 +46,6 @@ scaler = StandardScaler()
 df[feature_cols] = scaler.fit_transform(df[feature_cols])
 joblib.dump(scaler, "./models/3_resnet_scaler.pkl")
 
-# === Split ===
 if split_by_circuit:
     df_train_val = df[df["track"] != 2].copy()
     df_test = df[df["track"] == 2].copy()
@@ -72,8 +67,6 @@ else:
     X_val, y_val = X[split1:split2], y[split1:split2]
     X_test, y_test = X[split2:], y[split2:]
 
-
-# === Tensors and Dataloaders ===
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train, dtype=torch.long)
 X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
@@ -85,10 +78,6 @@ train_loader = DataLoader(TensorDataset(X_train_tensor, y_train_tensor), batch_s
 val_loader = DataLoader(TensorDataset(X_val_tensor, y_val_tensor), batch_size=batch_size)
 test_loader = DataLoader(TensorDataset(X_test_tensor, y_test_tensor), batch_size=batch_size)
 
-# === Model ===
-
-
-# === Training ===
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ResNet1DTabular(input_dim=X_train.shape[1], num_classes=len(result_classes)).to(device)
 criterion = nn.CrossEntropyLoss()
@@ -125,7 +114,6 @@ for epoch in range(num_epochs):
     train_losses.append(total_loss / len(train_loader))
     train_accuracies.append(correct_train / total_train)
 
-    # Validation
     model.eval()
     val_loss = 0
     correct_val = 0
@@ -153,7 +141,6 @@ for epoch in range(num_epochs):
 torch.save(model, "./models/3_resnet_full_model.pth")
 print("Modello salvato come './models/3_resnet_full_model.pth'")
 
-# === Evaluation ===
 model.eval()
 all_preds, all_labels = [], []
 with torch.no_grad():
@@ -166,7 +153,6 @@ with torch.no_grad():
 print("\nTest Classification Report:")
 print(classification_report(all_labels, all_preds, target_names=result_classes))
 
-# === Confusion Matrix ===
 conf_matrix = confusion_matrix(all_labels, all_preds, normalize='true')
 plt.figure(figsize=(10, 8))
 sns.heatmap(conf_matrix, annot=True, fmt='.2f', cmap='Blues', xticklabels=result_classes, yticklabels=result_classes)
@@ -177,7 +163,6 @@ plt.tight_layout()
 plt.show()
 
 plt.figure(figsize=(12, 6))
-# Subplot 1: Loss
 plt.subplot(1, 2, 1)
 plt.plot(train_losses, label='Training Loss')
 plt.plot(val_losses, label='Validation Loss')
@@ -186,7 +171,6 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 
-# Subplot 2: Accuracy
 plt.subplot(1, 2, 2)
 plt.plot(train_accuracies, label='Training Accuracy')
 plt.plot(val_accuracies, label='Validation Accuracy')

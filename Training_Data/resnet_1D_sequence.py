@@ -15,14 +15,12 @@ from preprocess_dataset import fix_dataset, load_telemetry_data
 from custom_early_stop import CustomEarlyStoppingTorch
 from r1s import ResNet1D
 
-# === Config ===
 split_by_circuit = True
 window_size = 5
 batch_size = 64
 num_epochs = 100
 patience = 8
 
-# === Load and preprocess ===
 df = load_telemetry_data("../data/dataset/vehicle_telemetry_*.csv")
 if df.empty:
     print("Nessun file trovato. Controlla il pattern o la cartella.")
@@ -30,7 +28,6 @@ if df.empty:
 
 df = fix_dataset(df)
 
-# Encoding
 result_encoder = LabelEncoder()
 df["result"] = result_encoder.fit_transform(df["result"])
 result_classes = result_encoder.classes_
@@ -39,13 +36,11 @@ df["driver"] = LabelEncoder().fit_transform(df["driver"])
 df["temp"] = LabelEncoder().fit_transform(df["temp"])
 df["time_idx"] = df.groupby(["track", "driver", "temp"]).cumcount()
 
-# Feature scaling
 feature_cols = [col for col in df.columns if col not in ["track", "driver", "temp", "result"]]
 scaler = StandardScaler()
 df[feature_cols] = scaler.fit_transform(df[feature_cols])
 joblib.dump(scaler, "./models/4_resnet1d_sequence_scaler.pkl")
 
-# === Create sequences with windowing ===
 group_cols = ["track", "driver", "temp"]
 sequences, labels, track_ids = [], [], []
 
@@ -60,13 +55,12 @@ for name, group in df.groupby(group_cols):
     for i in range(len(group) - window_size):
         sequences.append(group_features[i:i+window_size])
         labels.append(group_results[i + window_size - 1])
-        track_ids.append(name[0])  # track is first in group_cols
+        track_ids.append(name[0])
 
 X_seq = np.array(sequences)
 y_seq = np.array(labels)
 track_ids = np.array(track_ids)
 
-# === Split dataset ===
 if split_by_circuit:
     mask_train_val = track_ids != 2
     mask_test = track_ids == 2
@@ -86,12 +80,10 @@ else:
     X_val, y_val = X_seq[split1:split2], y_seq[split1:split2]
     X_test, y_test = X_seq[split2:], y_seq[split2:]
 
-# === Class weights ===
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_train), y=y_train)
 class_weights_tensor = torch.tensor(class_weights, dtype=torch.float32).to(device)
 
-# Convert to tensors
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train, dtype=torch.long)
 X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
@@ -99,7 +91,6 @@ y_val_tensor = torch.tensor(y_val, dtype=torch.long)
 X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
 y_test_tensor = torch.tensor(y_test, dtype=torch.long)
 
-# Create DataLoaders
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
 val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
 test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
@@ -108,9 +99,8 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size)
 test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
-# Initialize model
-input_features = X_train.shape[2]  # Numero di features
-seq_length = X_train.shape[1]      # Lunghezza della sequenza (window_size)
+input_features = X_train.shape[2]  
+seq_length = X_train.shape[1]    
 model = ResNet1D(input_features=input_features, 
                  seq_length=seq_length, 
                  num_classes=len(result_classes)).to(device)
@@ -119,7 +109,6 @@ criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 early_stopper = CustomEarlyStoppingTorch(patience=patience)
 
-# === Training Loop ===
 train_losses, val_losses = [], []
 train_accs, val_accs = [], []
 
@@ -148,7 +137,6 @@ for epoch in range(num_epochs):
     train_losses.append(train_loss)
     train_accs.append(train_acc)
     
-    # Validation
     model.eval()
     val_loss = 0.0
     correct_val = 0
@@ -182,7 +170,6 @@ for epoch in range(num_epochs):
 torch.save(model, "./models/4_resnet_seq_full_model.pth")
 print("Modello salvato come './models/4_resnet_seq_full_model.pth'")
 
-# === Evaluation ===
 model.eval()
 all_preds = []
 all_labels = []
@@ -198,7 +185,6 @@ with torch.no_grad():
 print("\nClassification Report:")
 print(classification_report(all_labels, all_preds, target_names=result_classes))
 
-# Confusion Matrix
 conf_matrix = confusion_matrix(all_labels, all_preds, normalize='true')
 plt.figure(figsize=(10, 8))
 sns.heatmap(conf_matrix, annot=True, fmt='.2f', cmap='Blues', 
@@ -208,7 +194,6 @@ plt.xlabel('Predicted')
 plt.ylabel('True')
 plt.show()
 
-# Plot training history
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
 plt.plot(train_losses, label='Train Loss')

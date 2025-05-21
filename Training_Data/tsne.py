@@ -1,17 +1,7 @@
-import pandas as pd
-import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from preprocess_dataset import fix_dataset, load_telemetry_data
-from keras.models import Sequential
-from keras.layers import Dense, Dropout
-from keras.utils import to_categorical
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.utils.class_weight import compute_class_weight
-from custom_early_stop import CustomEarlyStopping
-import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import joblib
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -24,20 +14,13 @@ if df.empty:
     exit()
 
 df = fix_dataset(df)
-
 result_encoder = LabelEncoder()
 df["result"] = result_encoder.fit_transform(df["result"])
 
-
-# Scala i dati
 scaler = StandardScaler()
-# Seleziona solo le feature numeriche
 feature_cols = [col for col in df.columns if col not in ["temp", "track", "driver"]]
-
 X_scaled = scaler.fit_transform(df[feature_cols])
 
-
-# T-SNE
 tsne = TSNE(n_components=2, random_state=42, n_jobs=-1, verbose=1)
 X_tsne = tsne.fit_transform(X_scaled)
 
