@@ -1,0 +1,25 @@
+Esperienza di guida in simulazione + guida normale, più persone, diversi climi
+
+
+Crrazione dataset:
+5 Minuti Soleggiato 36 gradi AEU
+5 Minuti Soleggiato 18 gradi AEU
+5 Minuti Soleggiato 0 gradi AEU
+
+
+5 Minuti Soleggiato 36 gradi Imola
+5 Minuti Soleggiato 18 gradi Imola
+5 Minuti Soleggiato 0 gradi Imola
+
+5 Minuti Soleggiato 36 gradi mugello
+5 Minuti Soleggiato 18 gradi mugello
+5 Minuti Soleggiato 0 gradi  mugello
+
+
+
+Provare anche la regressione
+Regressione con media davanti e media dietro delle gomme
+
+
+
+In aggiunta provare a sfalsare di 5 le label, in modo tale da predirre il futuro
